@@ -42,6 +42,7 @@ module test_fetcher();
 
 		.fb_adr_i(fb_adr_o),
 		.line_len_i(line_len_o),
+		.line_start_i(8'h00),
 		.s_we_o(s_we_i),
 		.s_adr_o(s_adr_i),
 

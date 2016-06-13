@@ -1,9 +1,80 @@
+`timescale 1ns / 1ps
+
+//
+// The fetcher is responsible for fetching the next scan-line's worth of video
+// data and placing it into a working scanline buffer.  This transfer will be
+// isochronous in nature, as it's triggered by the horizontal sync signal.
+// Bus arbiters must give this core absolute priority if the integrity of the
+// video signal is to be maintained.
+//
+// If an arbiter does not respect the fetcher's request for the bus, video
+// refresh will show artifacts, including but not limited to, partial re-
+// display of the previous scanline's contents, regions of black or color 0,
+// or smearing.  Exact behavior is deliberately left unspecified.
+//
+// Synopsis:
+//
+// hsync_i	An active-high horizontal sync signal.  This signal typically
+//		comes from the CRTC.  If den_i is asserted when hsync_i goes
+//		high, this signals the fetcher to obtain the next batch of
+//		halfwords from memory.  The burst length is configurable,
+//		per the line_len_i signal.
+//
+// vsync_i	An active-high vertical sync signal.  This signal typically
+//		comes from the CRTC.  When asserted, it causes the fetcher's
+//		video fetch pointer to reset to a known value.
+//
+// den_i	Typically set by the programmer, this is a global "display
+//		enable" signal.  If den_i is not asserted, it prevents the
+//		fetcher from functioning in any way.
+//
+// fb_adr_i	This bus holds the starting address for the video frame
+//		buffer.  Every VSYNC, the fetcher will reset its internal
+//		fetch pointer to this value.  This setting is typically
+//		configured by the prorammer via the CGIA's registers.
+//
+// line_len_i	This bus holds the length (in halfwords) of each video
+//		scanline.  At the start of each scanline fetch, an internal
+//		counter is reset to this value.  It counts down with each
+//		successful halfword fetch.  When it reaches the value 1, the
+//		CGIA releases cyc_o in the next cycle, indicating that no
+//		more halfwords are to be fetched.
+//
+// line_start_i	The initial position in the horizontal scanline buffer to start
+//		storing fetched video data.  Typically 0.
+//
+// s_we_o	Write Enable signal to the line buffer unit.
+//
+// s_adr_o	Write address to the line buffer unit.  At the start of each
+//		scanline fetch, this pointer is reset to the value held in
+//		line_start_i.  Typically 0, it is configurable by the
+//		programmer for implementing certain special effects.
+//
+// clk_i	Wishbone SYSCON clock.
+//
+// reset_i	Wishbone SYSCON reset.
+//
+// ack_i	Wishbone bus cycle acknowledge signal.  The addressed memory
+//		will drive this signal high when data is valid on the
+//		dat_i bus.
+//
+// adr_o	Bus master current address, which points into the video frame-
+//		buffer.  Monotonically increments when fetching data, except
+//		during vertical sync, at which point it's reset to fb_adr_i.
+//
+// cyc_o	Wishbone master CYC_O output.  It's asserted when a bus cycle
+//		is required.  It's typically consumed by a bus arbiter.
+//
+// stb_o	Wishbone master STB_O output.  It's asserted when data is
+//		expected on the dat_i bus.  Note that this pin covers all
+//		16 bits.
 module fetcher(
 	input	hsync_i,		// From CRTC: HSYNC (active high)
 	input	vsync_i,		// From CRTC: VSYNC (active high)
 	input	den_i,			// From REGSET: Display ENable
 	input	[23:1] fb_adr_i,	// From REGSET: framebuffer address
 	input	[9:1] line_len_i,	// From REGSET: Scanline length, in words
+	input	[8:1] line_start_i,	// From REGSET: Initial line buffer address
 	output	s_we_o,			// To LINEBUF: Write enable/data valid.
 	output	[8:1] s_adr_o,		// To LINEBUF: Buffer write address.
 
@@ -12,7 +83,8 @@ module fetcher(
 
 	input	ack_i,			// MASTER bus cycle acknowledge
 	output	[23:1] adr_o,		// MASTER address bus
-	output	cyc_o			// MASTER bus cycle in progress
+	output	cyc_o,			// MASTER bus cycle in progress
+	output	stb_o			// MASTER bus cycle in progress.
 );
 	wire slave_data_valid = cyc_o & ack_i;
 
@@ -30,6 +102,8 @@ module fetcher(
 	assign s_we_o = slave_data_valid;	// No special processing for write-enable.
 	reg [8:1] s_adr_o;
 	wire [8:1] next_s_adr = slave_data_valid ? s_adr_o + 1 : s_adr_o ;
+
+	assign stb_o = cyc_o;
 
 	always @(posedge clk_i) begin
 		// Word Counter
@@ -51,7 +125,7 @@ module fetcher(
 		end else if(start_fetching) begin
 			cyc_o <= 1;
 			word_counter <= line_len_i;
-			s_adr_o <= 0;
+			s_adr_o <= line_start_i;
 		end else if(stop_fetching) begin
 			cyc_o <= 0;
 		end
