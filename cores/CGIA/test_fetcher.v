@@ -27,6 +27,7 @@ module test_fetcher();
 	reg den_o;		// REGSET Display ENable.
 	reg [23:1] fb_adr_o;	// REGSET Start of frame buffer.
 	reg [9:1] line_len_o;	// REGSET Length of frame buffer line, in bytes.
+	wire s_we_i;		// Line buffer write-enable.
 
 	// Convenience assignments, so I don't have to do mental gyrations
 	// in the test code.
@@ -40,6 +41,7 @@ module test_fetcher();
 
 		.fb_adr_i(fb_adr_o),
 		.line_len_i(line_len_o),
+		.s_we_o(s_we_i),
 
 		.clk_i(clk_o),
 		.reset_i(reset_o),
@@ -144,6 +146,10 @@ module test_fetcher();
 			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0002, adr_i);
 			$stop;
 		end
+		if(s_we_i !== 0) begin
+			$display("@E %04X Expected S_WE_O low since we're waiting for data", story_o);
+			$stop;
+		end
 
 		story_o <= 16'h0501;
 		wait(clk_o); wait(~clk_o);
@@ -151,6 +157,11 @@ module test_fetcher();
 			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0002, adr_i);
 			$stop;
 		end
+		if(s_we_i !== 0) begin
+			$display("@E %04X Expected S_WE_O low since we're waiting for data", story_o);
+			$stop;
+		end
+
 
 		story_o <= 16'h0502;
 		wait(clk_o); wait(~clk_o);
@@ -158,6 +169,11 @@ module test_fetcher();
 			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0002, adr_i);
 			$stop;
 		end
+		if(s_we_i !== 0) begin
+			$display("@E %04X Expected S_WE_O low since we're waiting for data", story_o);
+			$stop;
+		end
+
 
 		story_o <= 16'h0503;
 		ack_o <= 1;
@@ -166,6 +182,11 @@ module test_fetcher();
 			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0004, adr_i);
 			$stop;
 		end
+		if(s_we_i !== 1) begin
+			$display("@E %04X Expected S_WE_O high since we're no longer waiting for data", story_o);
+			$stop;
+		end
+
 
 		// We only need to fetch as many words from video memory as it makes sense to.
 		// For instance, a 640-pixel wide line consists of 40 16-bit words, so trying to

@@ -4,6 +4,7 @@ module fetcher(
 	input	den_i,			// From REGSET: Display ENable
 	input	[23:1] fb_adr_i,	// From REGSET: framebuffer address
 	input	[9:1] line_len_i,	// From REGSET: Scanline length, in words
+	output	s_we_o,			// To LINEBUF: Write enable/data valid.
 
 	input	clk_i,			// SYSCON clock
 	input	reset_i,		// SYSCON reset
@@ -20,6 +21,8 @@ module fetcher(
 
 	wire start_fetching = hsync_i & den_i & ~cyc_o;
 	wire stop_fetching = cyc_o & next_word_counter_zero;
+
+	assign s_we_o = ack_i;		// No special processing for write-enable.
 
 	reg cyc_o;
 	reg [23:1] adr_o;
