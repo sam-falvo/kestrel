@@ -28,6 +28,7 @@ module test_fetcher();
 	reg [23:1] fb_adr_o;	// REGSET Start of frame buffer.
 	reg [9:1] line_len_o;	// REGSET Length of frame buffer line, in bytes.
 	wire s_we_i;		// Line buffer write-enable.
+	wire [8:1] s_adr_i;	// Line buffer store address.
 
 	// Convenience assignments, so I don't have to do mental gyrations
 	// in the test code.
@@ -42,6 +43,7 @@ module test_fetcher();
 		.fb_adr_i(fb_adr_o),
 		.line_len_i(line_len_o),
 		.s_we_o(s_we_i),
+		.s_adr_o(s_adr_i),
 
 		.clk_i(clk_o),
 		.reset_i(reset_o),
@@ -101,6 +103,9 @@ module test_fetcher();
 		// the fetcher needs to start fetching from memory.  It should
 		// request the bus by asserting its CYC_O.  But, only if DEN_I
 		// is asserted.
+		//
+		// Also, when we start a new burst of video data, we must start
+		// writing the video line buffer from the beginning.
 		story_o <= 16'h0300;
 		hsync_o <= 1;
 		den_o <= 0;
@@ -123,6 +128,10 @@ module test_fetcher();
 			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0000, adr_i);
 			$stop;
 		end
+		if(s_adr_i !== 0) begin
+			$display("@E %04X Writes to line buffer must start at 0", story_o);
+			$stop;
+		end
 
 		// Fetching may well take longer than the span of time HSYNC is asserted.
 		story_o <= 16'h0400;
@@ -135,6 +144,10 @@ module test_fetcher();
 		end
 		if(adr_i !== 24'hFF0002) begin
 			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0002, adr_i);
+			$stop;
+		end
+		if(s_adr_i !== 1) begin
+			$display("@E %04X Line buffer address expected to be 1; got %d", story_o, s_adr_i);
 			$stop;
 		end
 

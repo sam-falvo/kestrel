@@ -5,6 +5,7 @@ module fetcher(
 	input	[23:1] fb_adr_i,	// From REGSET: framebuffer address
 	input	[9:1] line_len_i,	// From REGSET: Scanline length, in words
 	output	s_we_o,			// To LINEBUF: Write enable/data valid.
+	output	[8:1] s_adr_o,		// To LINEBUF: Buffer write address.
 
 	input	clk_i,			// SYSCON clock
 	input	reset_i,		// SYSCON reset
@@ -22,16 +23,20 @@ module fetcher(
 	wire start_fetching = hsync_i & den_i & ~cyc_o;
 	wire stop_fetching = cyc_o & next_word_counter_zero;
 
-	assign s_we_o = ack_i;		// No special processing for write-enable.
-
 	reg cyc_o;
 	reg [23:1] adr_o;
-
 	wire [23:1] next_adr = slave_data_valid ? adr_o + 1 : adr_o;
+
+	assign s_we_o = slave_data_valid;	// No special processing for write-enable.
+	reg [8:1] s_adr_o;
+	wire [8:1] next_s_adr = slave_data_valid ? s_adr_o + 1 : s_adr_o ;
 
 	always @(posedge clk_i) begin
 		// Word Counter
 		word_counter <= next_word_counter;
+
+		// Line Buffer Interface Driver
+		s_adr_o <= next_s_adr;
 
 		// Address bus driver
 		case({cyc_o, vsync_i})
@@ -46,6 +51,7 @@ module fetcher(
 		end else if(start_fetching) begin
 			cyc_o <= 1;
 			word_counter <= line_len_i;
+			s_adr_o <= 0;
 		end else if(stop_fetching) begin
 			cyc_o <= 0;
 		end
