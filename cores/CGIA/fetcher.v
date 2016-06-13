@@ -12,6 +12,30 @@
 // display of the previous scanline's contents, regions of black or color 0,
 // or smearing.  Exact behavior is deliberately left unspecified.
 //
+//                  Line Buffer (CGIA)
+// +--------------+     +-------------+
+// |      s_adr_o |====>| S_ADR_I     |
+// |      s_dat_o |====>| S_DAT_I     |
+// |       s_we_o |---->| S_WE_I      |
+// |              |     +-------------+
+// |              |
+// |              |      Memory (External)
+// |              |     +------------+
+// |        adr_o |====>| MEM_ADR_I  |
+// |        cyc_o |---->| MEM_CYC_I  |
+// |        stb_o |---->| MEM_STB_I  |
+// |        dat_i |<====| MEM_DAT_O  |
+// |        ack_i |<----| MEM_ACK_O  |
+// |              |     +------------+
+// |              |
+// | line_start_i |<====... from register set of CGIA
+// |   line_len_i |<====... from register set of CGIA
+// |     fb_adr_i |<====... from register set of CGIA
+// |        den_i |<----... from register set of CGIA
+// |      vsync_i |<----... from CRTC
+// |      hsync_i |<----... from CRTC
+// +--------------+
+//
 // Synopsis:
 //
 // hsync_i	An active-high horizontal sync signal.  This signal typically
