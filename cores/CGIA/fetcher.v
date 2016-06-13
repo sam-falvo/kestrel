@@ -7,13 +7,16 @@ module fetcher(
 
 	output	cyc_o		// MASTER bus cycle in progress
 );
+	wire start_fetching = hsync_i & den_i;
+
 	reg cyc_o;
 
-	wire busreq;
-	assign busreq = den_i & hsync_i;
-
 	always @(posedge clk_i) begin
-		cyc_o <= busreq;
+		if(reset_i) begin
+			cyc_o <= 0;
+		end else if(start_fetching) begin
+			cyc_o <= 1;
+		end;
 	end
 endmodule
 

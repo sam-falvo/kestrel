@@ -85,6 +85,16 @@ module test_fetcher();
 			$stop;
 		end
 
+		// Fetching may well take longer than the span of time HSYNC is asserted.
+		story_o <= 16'h0300;
+		hsync_o <= 0;
+		den_o <= 1;
+		wait(clk_o); wait(~clk_o);
+		if(~cyc_i) begin
+			$display("@E %04X Fetcher needs to continue fetching after HSYNC", story_o);
+			$stop;
+		end
+
 		#100 $display("@I OK");
 		$stop;
 	end
