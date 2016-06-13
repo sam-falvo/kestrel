@@ -51,7 +51,8 @@ module test_fetcher();
 
 		.ack_i(ack_o),
 		.cyc_o(cyc_i),
-		.adr_o(adr_i_raw)
+		.adr_o(adr_i_raw),
+		.dat_i(16'hCC)
 	);
 
 	// 50MHz clock (1/50MHz = 20ns)

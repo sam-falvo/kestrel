@@ -50,6 +50,8 @@
 //		line_start_i.  Typically 0, it is configurable by the
 //		programmer for implementing certain special effects.
 //
+// s_dat_o	The data to write to the video line buffer.
+//
 // clk_i	Wishbone SYSCON clock.
 //
 // reset_i	Wishbone SYSCON reset.
@@ -61,6 +63,8 @@
 // adr_o	Bus master current address, which points into the video frame-
 //		buffer.  Monotonically increments when fetching data, except
 //		during vertical sync, at which point it's reset to fb_adr_i.
+//
+// dat_i	Wishbone data bus coming from the slave.
 //
 // cyc_o	Wishbone master CYC_O output.  It's asserted when a bus cycle
 //		is required.  It's typically consumed by a bus arbiter.
@@ -77,12 +81,14 @@ module fetcher(
 	input	[8:1] line_start_i,	// From REGSET: Initial line buffer address
 	output	s_we_o,			// To LINEBUF: Write enable/data valid.
 	output	[8:1] s_adr_o,		// To LINEBUF: Buffer write address.
+	output	[15:0] s_dat_o,		// To LINEBUF: Buffer data.
 
 	input	clk_i,			// SYSCON clock
 	input	reset_i,		// SYSCON reset
 
 	input	ack_i,			// MASTER bus cycle acknowledge
 	output	[23:1] adr_o,		// MASTER address bus
+	input	[15:0] dat_i,		// MASTER data input bus
 	output	cyc_o,			// MASTER bus cycle in progress
 	output	stb_o			// MASTER bus cycle in progress.
 );
@@ -104,6 +110,7 @@ module fetcher(
 	wire [8:1] next_s_adr = slave_data_valid ? s_adr_o + 1 : s_adr_o ;
 
 	assign stb_o = cyc_o;
+	assign s_dat_o = dat_i;
 
 	always @(posedge clk_i) begin
 		// Word Counter
