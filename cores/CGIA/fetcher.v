@@ -7,14 +7,16 @@ module fetcher(
 	input	clk_i,			// SYSCON clock
 	input	reset_i,		// SYSCON reset
 
+	input	ack_i,			// MASTER bus cycle acknowledge
 	output	[23:1] adr_o,		// MASTER address bus
 	output	cyc_o			// MASTER bus cycle in progress
 );
 	wire start_fetching = hsync_i & den_i & ~cyc_o;
+	wire slave_data_valid = cyc_o & ack_i;
 
 	reg cyc_o;
 	reg [23:1] adr_o;
-	wire [23:1] next_adr = adr_o + 1;
+	wire [23:1] next_adr = slave_data_valid ? adr_o + 1 : adr_o;
 
 	always @(posedge clk_i) begin
 		// Address bus driver

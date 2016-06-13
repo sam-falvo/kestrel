@@ -20,6 +20,7 @@ module test_fetcher();
 
 	wire cyc_i;		// Wishbone MASTER bus cycle in progress.
 	wire [23:1] adr_i_raw;	// Wishbone MASTER address bus.
+	reg ack_o;		// Wishbone MASTER cycle acknowledge.
 
 	reg hsync_o;		// CRTC HSYNC output (active high).
 	reg vsync_o;		// CRTC VSYNC output (active high).
@@ -41,6 +42,7 @@ module test_fetcher();
 		.clk_i(clk_o),
 		.reset_i(reset_o),
 
+		.ack_i(ack_o),
 		.cyc_o(cyc_i),
 		.adr_o(adr_i_raw)
 	);
@@ -56,6 +58,8 @@ module test_fetcher();
 		hsync_o <= 0;
 		vsync_o <= 0;
 		den_o <= 0;
+		ack_o <= 1;
+
 		fb_adr_o <= (24'hFF0000) >> 1;
 
 		// Going into reset, the CGIA must negate its CYC_O signal.
@@ -126,6 +130,37 @@ module test_fetcher();
 		end
 		if(adr_i !== 24'hFF0002) begin
 			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0002, adr_i);
+			$stop;
+		end
+
+		// Fetching must accept wait-states.
+		story_o <= 16'h0500;
+		ack_o <= 0;
+		wait(clk_o); wait(~clk_o);
+		if(adr_i !== 24'hFF0002) begin
+			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0002, adr_i);
+			$stop;
+		end
+
+		story_o <= 16'h0501;
+		wait(clk_o); wait(~clk_o);
+		if(adr_i !== 24'hFF0002) begin
+			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0002, adr_i);
+			$stop;
+		end
+
+		story_o <= 16'h0502;
+		wait(clk_o); wait(~clk_o);
+		if(adr_i !== 24'hFF0002) begin
+			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0002, adr_i);
+			$stop;
+		end
+
+		story_o <= 16'h0503;
+		ack_o <= 1;
+		wait(clk_o); wait(~clk_o);
+		if(adr_i !== 24'hFF0004) begin
+			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0004, adr_i);
 			$stop;
 		end
 
