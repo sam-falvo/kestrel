@@ -26,6 +26,7 @@ module test_fetcher();
 	reg vsync_o;		// CRTC VSYNC output (active high).
 	reg den_o;		// REGSET Display ENable.
 	reg [23:1] fb_adr_o;	// REGSET Start of frame buffer.
+	reg [9:1] line_len_o;	// REGSET Length of frame buffer line, in bytes.
 
 	// Convenience assignments, so I don't have to do mental gyrations
 	// in the test code.
@@ -38,6 +39,7 @@ module test_fetcher();
 		.vsync_i(vsync_o),
 
 		.fb_adr_i(fb_adr_o),
+		.line_len_i(line_len_o),
 
 		.clk_i(clk_o),
 		.reset_i(reset_o),
@@ -61,6 +63,7 @@ module test_fetcher();
 		ack_o <= 1;
 
 		fb_adr_o <= (24'hFF0000) >> 1;
+		line_len_o <= 6;
 
 		// Going into reset, the CGIA must negate its CYC_O signal.
 		story_o <= 16'h0000;
@@ -161,6 +164,86 @@ module test_fetcher();
 		wait(clk_o); wait(~clk_o);
 		if(adr_i !== 24'hFF0004) begin
 			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0004, adr_i);
+			$stop;
+		end
+
+		// We only need to fetch as many words from video memory as it makes sense to.
+		// For instance, a 640-pixel wide line consists of 40 16-bit words, so trying to
+		// fetch more than 40 words will just waste bus bandwidth.  Depending on the
+		// maturity of the CGIA's implementation, it can also lead to "unspecified
+		// behavior."
+		//
+		// We've already fetched 3 words.  Let's fetch three more, and then make sure that
+		// CYC_O negates afterwards (you may recall that we set line_len_o <= 6 above).
+		story_o <= 16'h0600;
+		wait(clk_o); wait(~clk_o);
+		if(adr_i !== 24'hFF0006) begin
+			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0004, adr_i);
+			$stop;
+		end
+		if(cyc_i !== 1) begin
+			$display("@E %04X Expected CYC_O to remain asserted", story_o);
+			$stop;
+		end
+
+		story_o <= 16'h0601;
+		wait(clk_o); wait(~clk_o);
+		if(adr_i !== 24'hFF0008) begin
+			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0004, adr_i);
+			$stop;
+		end
+		if(cyc_i !== 1) begin
+			$display("@E %04X Expected CYC_O to remain asserted", story_o);
+			$stop;
+		end
+
+		story_o <= 16'h0602;
+		wait(clk_o); wait(~clk_o);
+		if(adr_i !== 24'hFF000A) begin
+			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0004, adr_i);
+			$stop;
+		end
+		if(cyc_i !== 1) begin
+			$display("@E %04X Expected CYC_O to remain asserted", story_o);
+			$stop;
+		end
+
+		story_o <= 16'h0603;
+		wait(clk_o); wait(~clk_o);
+		if(cyc_i !== 0) begin
+			$display("@E %04X Expected CYC_O to negate when burst finished.", story_o);
+			$stop;
+		end
+
+		// After we're done fetching, we are done.  We should not see any further bus activity
+		// until HSYNC is encountered again.  We use a simple heuristic here, mostly b/c I
+		// am ignorant of how to do a "for-next" loop in Verilog.  On an airplane, so cannot
+		// look it up either.  But, honestly, it doesn't matter.
+		story_o <= 16'h0700;
+		wait(clk_o); wait(~clk_o);
+		if(cyc_i !== 0) begin
+			$display("@E %04X Expected CYC_O to remain negated after burst.", story_o);
+			$stop;
+		end
+
+		story_o <= 16'h0701;
+		wait(clk_o); wait(~clk_o);
+		if(cyc_i !== 0) begin
+			$display("@E %04X Expected CYC_O to remain negated after burst.", story_o);
+			$stop;
+		end
+
+		story_o <= 16'h0702;
+		wait(clk_o); wait(~clk_o);
+		if(cyc_i !== 0) begin
+			$display("@E %04X Expected CYC_O to remain negated after burst.", story_o);
+			$stop;
+		end
+
+		story_o <= 16'h0703;
+		wait(clk_o); wait(~clk_o);
+		if(cyc_i !== 0) begin
+			$display("@E %04X Expected CYC_O to remain negated after burst.", story_o);
 			$stop;
 		end
 
