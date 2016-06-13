@@ -55,8 +55,8 @@ module line_buffers(
 	input		S_WE_I
 );
 
-	reg	[15:0]	line_a[0:63];
-	reg	[15:0]	line_b[0:63];
+	reg	[15:0]	line_a[0:511];
+	reg	[15:0]	line_b[0:511];
 	reg	[15:0]	f_q;
 
 	assign	F_DAT_O = f_q;
