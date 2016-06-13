@@ -23,7 +23,7 @@ module test_fetcher();
 
 	reg hsync_o;		// CRTC HSYNC output (active high).
 	reg vsync_o;		// CRTC VSYNC output (active high).
-	reg den_o;		// CRTC Display ENable.
+	reg den_o;		// REGSET Display ENable.
 	reg [23:1] fb_adr_o;	// REGSET Start of frame buffer.
 
 	// Convenience assignments, so I don't have to do mental gyrations
@@ -77,10 +77,22 @@ module test_fetcher();
 			$stop;
 		end
 
+		// Before we can fetch, we need to load the current framebuffer address register.
+		// This is done by reading the framebuffer base address configuration register
+		// at every VSYNC period.
+		story_o <= 16'h0200;
+		vsync_o <= 1;
+		wait(clk_o); wait(~clk_o);
+		if(adr_i != 24'hFF0000) begin
+			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0000, adr_i);
+			$stop;
+		end
+
 		// When we start horizontal sync and the display is enabled,
 		// the fetcher needs to start fetching from memory.  It should
-		// request the bus by asserting its CYC_O.
-		story_o <= 16'h0200;
+		// request the bus by asserting its CYC_O.  But, only if DEN_I
+		// is asserted.
+		story_o <= 16'h0300;
 		hsync_o <= 1;
 		den_o <= 0;
 		wait(clk_o); wait(~clk_o);
@@ -89,18 +101,7 @@ module test_fetcher();
 			$stop;
 		end
 
-		// Before we can fetch, we need to load the current framebuffer address register.
-		// This is done by reading the framebuffer base address configuration register
-		// at every VSYNC period.
-		story_o <= 16'h0208;
-		vsync_o <= 1;
-		wait(clk_o); wait(~clk_o);
-		if(adr_i != 24'hFF0000) begin
-			$display("@E %04X Expected address $%06X, got $%06X", story_o, 24'hFF0000, adr_i);
-			$stop;
-		end
-
-		story_o <= 16'h0210;
+		story_o <= 16'h0310;
 		vsync_o <= 0;
 		hsync_o <= 1;
 		den_o <= 1;
@@ -115,7 +116,7 @@ module test_fetcher();
 		end
 
 		// Fetching may well take longer than the span of time HSYNC is asserted.
-		story_o <= 16'h0300;
+		story_o <= 16'h0400;
 		hsync_o <= 0;
 		den_o <= 1;
 		wait(clk_o); wait(~clk_o);

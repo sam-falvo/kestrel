@@ -1,8 +1,7 @@
 module fetcher(
 	input	hsync_i,		// From CRTC: HSYNC (active high)
 	input	vsync_i,		// From CRTC: VSYNC (active high)
-	input	den_i,			// From CRTC: Display ENable
-
+	input	den_i,			// From REGSET: Display ENable
 	input	[23:1] fb_adr_i,	// From REGSET: framebuffer address
 
 	input	clk_i,			// SYSCON clock
