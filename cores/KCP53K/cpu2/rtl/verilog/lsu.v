@@ -18,10 +18,18 @@ module lsu(
 	output		wbmwe_o,
 	output		wbmstb_o,
 	output		wbmcyc_o,
-	input		wbmack_i
+	input		wbmack_i,
+	input	[15:0]	wbmdat_i
 );
 	reg	[63:0]	dat_o;
 	reg		rwe_o;
+
+	// State machine for Wishbone B.4 bus.
+	// I truly hate having to use so many MUXes and other
+	// combinatorials.  But, it's the only way I can keep
+	// the number of clock cycles consumed under control.
+	// This will slow the maximum speed of the pipeline,
+	// however.
 
 	reg		mt0, mt1, mt2, mt3;	// Master timeslots
 	reg		st0, st1, st2, st3;	// Slave timeslots
@@ -65,6 +73,9 @@ module lsu(
 			if(nomem_i) begin
 				dat_o <= addr_i;
 				rwe_o <= 1;
+			end
+			if(st0 & wbmack_i) begin
+				dat_o <= {{48{wbmdat_i[15]}}, wbmdat_i};
 			end
 		end
 	end

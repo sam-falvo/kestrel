@@ -15,6 +15,7 @@ module lsu_tb();
 	wire	[15:0]	wbmdat_o;
 	wire		wbmwe_o, wbmstb_o;
 	reg		wbmack_i;
+	reg	[15:0]	wbmdat_i;
 
 	lsu ls(
 		.clk_i(clk_i),
@@ -32,7 +33,8 @@ module lsu_tb();
 		.wbmdat_o(wbmdat_o),
 		.wbmwe_o(wbmwe_o),
 		.wbmstb_o(wbmstb_o),
-		.wbmack_i(wbmack_i)
+		.wbmack_i(wbmack_i),
+		.wbmdat_i(wbmdat_i)
 	);
 
 	`STANDARD_FAULT
@@ -103,6 +105,14 @@ module lsu_tb();
 		// the LSU must initiate and wait for the complete
 		// Wishbone transaction to complete.  Further, it must
 		// disable register write-back.
+		//
+		// Note that the LSU performs both a read AND a write,
+		// irrespective of the we_i signal.  It's up to the
+		// external peripheral to respect the we_i signal.
+		// Similarly, while the LSU "reads" data even during a
+		// write transaction, the register writeback stage is
+		// responsible for ignoring this value, as rd_i will be
+		// forced to 0.
 
 		story_to <= 12'h040;
 
@@ -110,6 +120,8 @@ module lsu_tb();
 		addr_i <= 64'h1122334455667788;
 		dat_i <= 64'h7766554433221100;
 		we_i <= 1;
+		wbmdat_i <= 16'hDEAD;
+
 		wait(~clk_i); wait(clk_i); #1;
 
 		hword_i <= 0;
@@ -120,7 +132,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_rwe(0);
-		
+
 		wait(~clk_i); wait(clk_i); #1;
 
 		assert_busy(1);
@@ -132,6 +144,8 @@ module lsu_tb();
 		wait(~clk_i); wait(clk_i); #1;
 
 		assert_rwe(0);
+		assert_dat(64'hFFFFFFFFFFFFDEAD);
+
 		wbmack_i <= 0;
 
 		#100;
