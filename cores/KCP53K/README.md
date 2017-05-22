@@ -18,6 +18,9 @@ The following cores exist so far in this repository:
 |KCP53002|wb-bridge|64-bit Wishbone interconnect bridge.|Not yet (note 1)|
 |KCP53003|bottleneck|64-bit to 16-bit Furcula bridge.|Not yet|
 |KCP53004|ramcon|16-bit Micron Cellular RAM controller for the [Digilent Nexys-2](http://store.digilentinc.com/nexys-2-spartan-3e-fpga-trainer-board-retired-see-nexys-4-ddr/).|Not yet|
+|KCP53005|-|Serial Interface Adapter (SIA)|Not yet|
+|KCP53006|-|Initial Program Adapter (IPA)|Not yet|
+|KCP53007|cpu2|64-bit processor built on the RISC-V 64-bit integer instruction set.  Tailored specifically for 16-bit Wishbone B.4 data-paths.|Not yet|
 
 **Notes**
 
