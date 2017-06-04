@@ -5,7 +5,7 @@
 module lsu_tb();
 	reg	[11:0]	story_to;
 	reg		fault_to;
-	reg		clk_i, reset_i, we_i, nomem_i, hword_i, word_i;
+	reg		clk_i, reset_i, we_i, nomem_i, hword_i, word_i, dword_i;
 	reg	[63:0]	addr_i, dat_i;
 
 	wire		busy_o, rwe_o;
@@ -25,6 +25,7 @@ module lsu_tb();
 		.nomem_i(nomem_i),
 		.hword_i(hword_i),
 		.word_i(word_i),
+		.dword_i(dword_i),
 		.busy_o(busy_o),
 		.rwe_o(rwe_o),
 		.dat_o(dat_o),
@@ -63,7 +64,11 @@ module lsu_tb();
 		$dumpfile("lsu.vcd");
 		$dumpvars;
 
-		{wbmack_i, addr_i, dat_i, we_i, nomem_i, hword_i, word_i, clk_i, reset_i, story_to, fault_to} <= 0;
+		{
+		  wbmack_i, addr_i, dat_i, we_i, nomem_i, hword_i, word_i,
+		  dword_i, clk_i, reset_i, story_to, fault_to
+		} <= 0;
+
 		wait(~clk_i); wait(clk_i); #1;
 
 		reset;
@@ -200,6 +205,84 @@ module lsu_tb();
 
 		assert_rwe(0);
 		assert_dat(64'h00000000DEADBEEF);
+
+		wbmack_i <= 0;
+
+		// When writing a double-word to memory,
+		// the LSU must initiate and wait for the complete
+		// Wishbone transaction to complete.  In this case,
+		// the transfer consists of four cycles.
+
+		story_to <= 12'h060;
+
+		dword_i <= 1;
+		addr_i <= 64'h1122334455667788;
+		dat_i <= 64'h7766554433221100;
+		we_i <= 1;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		dword_i <= 0;
+
+		assert_busy(1);
+		assert_wbmadr(64'h112233445566778E);
+		assert_wbmdat(16'h7766);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_rwe(0);
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmadr(64'h112233445566778C);
+		assert_wbmdat(16'h5544);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_rwe(0);
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmadr(64'h112233445566778A);
+		assert_wbmdat(16'h3322);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_rwe(0);
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmadr(64'h1122334455667788);
+		assert_wbmdat(16'h1100);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_rwe(0);
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmstb(0);
+		assert_rwe(0);
+		
+		wbmack_i <= 1;
+		wbmdat_i <= 16'hDEAD;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		wbmdat_i <= 16'hBEEF;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		wbmdat_i <= 16'h0BAD;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		wbmdat_i <= 16'hC0DE;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_rwe(0);
+		assert_dat(64'hDEADBEEF0BADC0DE);
 
 		wbmack_i <= 0;
 

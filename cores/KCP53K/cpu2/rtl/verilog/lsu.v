@@ -9,6 +9,7 @@ module lsu(
 	input		nomem_i,
 	input		hword_i,
 	input		word_i,
+	input		dword_i,
 	output		busy_o,
 	output		rwe_o,
 	output	[63:0]	dat_o,
@@ -38,17 +39,21 @@ module lsu(
 	wire		next_mt0 = hword_i | mt1;
 	wire		next_mt1 = word_i | mt2;
 	wire		next_mt2 = mt3;
-	wire		next_mt3 = 0;
+	wire		next_mt3 = dword_i;
 
 	wire		next_st0 = hword_i | (st0 & ~wbmack_i) | st1;
 	wire		next_st1 = word_i | (st1 & ~wbmack_i) | st2;
 	wire		next_st2 = (st2 & ~wbmack_i) | st3;
-	wire		next_st3 = st3 & ~wbmack_i;
+	wire		next_st3 = dword_i | (st3 & ~wbmack_i);
 
 	assign		wbmadr_o = (mt0 ? {addr_i[63:1], 1'b0} : 0)
-				 | (mt1 ? {addr_i[63:2], 2'b10} : 0);
+				 | (mt1 ? {addr_i[63:2], 2'b10} : 0)
+				 | (mt2 ? {addr_i[63:3], 3'b100} : 0)
+				 | (mt3 ? {addr_i[63:3], 3'b110} : 0);
 	assign		wbmdat_o = (mt0 ? dat_i[15:0] : 0)
-				 | (mt1 ? dat_i[31:16] : 0);
+				 | (mt1 ? dat_i[31:16] : 0)
+				 | (mt2 ? dat_i[47:32] : 0)
+				 | (mt3 ? dat_i[63:48] : 0);
 	assign		wbmstb_o = mt0 | mt1 | mt2 | mt3;
 	assign		wbmwe_o = wbmstb_o ? we_i : 0;
 
