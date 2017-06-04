@@ -7,6 +7,7 @@ module lsu_tb();
 	reg		fault_to;
 	reg		clk_i, reset_i, we_i, nomem_i, hword_i, word_i, dword_i;
 	reg	[63:0]	addr_i, dat_i;
+	reg	[1:0]	sel_i;
 
 	wire		busy_o, rwe_o;
 	wire	[63:0]	dat_o;
@@ -31,6 +32,7 @@ module lsu_tb();
 		.rwe_o(rwe_o),
 		.dat_o(dat_o),
 		.dat_i(dat_i),
+		.sel_i(sel_i),
 
 		.wbmadr_o(wbmadr_o),
 		.wbmdat_o(wbmdat_o),
@@ -69,7 +71,7 @@ module lsu_tb();
 
 		{
 		  wbmack_i, addr_i, dat_i, we_i, nomem_i, hword_i, word_i,
-		  dword_i, clk_i, reset_i, story_to, fault_to
+		  dword_i, clk_i, reset_i, story_to, fault_to, sel_i
 		} <= 0;
 
 		wait(~clk_i); wait(clk_i); #1;
@@ -134,6 +136,7 @@ module lsu_tb();
 		dat_i <= 64'h7766554433221100;
 		we_i <= 1;
 		wbmdat_i <= 16'hDEAD;
+		sel_i <= 2'b11;
 
 		wait(~clk_i); wait(clk_i); #1;
 
@@ -302,6 +305,64 @@ module lsu_tb();
 		assert_dat(64'hDEADBEEF0BADC0DE);
 
 		wbmack_i <= 0;
+
+		// When writing individual bytes to memory,
+		// yeah, you know the drill.  But this time, things
+		// are a little different.
+		//
+		// Since half-words are the smallest unit of transfer
+		// on any given clock cycle, the instruction decoder
+		// must assert hword_i to commence the transfer (since a
+		// single byte occupies only a single cycle).
+		// However, sel_i must be either 2'b01 or 2'b10 to select
+		// the appropriate byte lane.
+		//
+		// Also, in this condition, dat_i[7:0] is the source of
+		// data to store (assuming we_i is set), while dat_o[7:0]
+		// is always the data read back (if any), REGARDLESS of
+		// which byte lane is enabled.
+
+		// These tests exercise the lower byte.
+
+		story_to <= 12'h080;
+
+		hword_i <= 1;
+		sel_i <= 2'b01;
+		addr_i <= 64'h1122334455667788;
+		dat_i <= 64'h77665544332211A5;
+		we_i <= 1;
+		wbmdat_i <= 16'hDEAD;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		hword_i <= 0;
+
+		assert_busy(1);
+		assert_wbmadr(64'h1122334455667788);
+		assert_wbmdat(16'hA5A5);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b01);
+		assert_rwe(0);
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmstb(0);
+		assert_wbmsel(2'b00);
+		assert_rwe(0);
+		
+		wbmack_i <= 1;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_rwe(0);
+		assert_dat(64'h00000000000000AD);
+
+		wbmack_i <= 0;
+
+
+		// These tests exercise the upper byte.
 
 		#100;
 		$stop;

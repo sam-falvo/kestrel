@@ -14,6 +14,7 @@ module lsu(
 	output		rwe_o,
 	output	[63:0]	dat_o,
 	input	[63:0]	dat_i,
+	input	[1:0]	sel_i,
 
 	output	[63:0]	wbmadr_o,
 	output	[15:0]	wbmdat_o,
@@ -37,6 +38,9 @@ module lsu(
 	reg		mt0, mt1, mt2, mt3;	// Master timeslots
 	reg		st0, st1, st2, st3;	// Slave timeslots
 
+	wire		send_low_byte = sel_i == 2'b01;
+	wire		send_hword = sel_i == 2'b11;
+
 	wire		next_mt0 = hword_i | mt1;
 	wire		next_mt1 = word_i | mt2;
 	wire		next_mt2 = mt3;
@@ -47,17 +51,19 @@ module lsu(
 	wire		next_st2 = (st2 & ~wbmack_i) | st3;
 	wire		next_st3 = dword_i | (st3 & ~wbmack_i);
 
-	assign		wbmadr_o = (mt0 ? {addr_i[63:1], 1'b0} : 0)
+	assign		wbmadr_o = ((mt0 & send_low_byte) ? addr_i : 0)
+				 | ((mt0 & send_hword) ? {addr_i[63:1], 1'b0} : 0)
 				 | (mt1 ? {addr_i[63:2], 2'b10} : 0)
 				 | (mt2 ? {addr_i[63:3], 3'b100} : 0)
 				 | (mt3 ? {addr_i[63:3], 3'b110} : 0);
-	assign		wbmdat_o = (mt0 ? dat_i[15:0] : 0)
+	assign		wbmdat_o = ((mt0 & send_low_byte) ? {dat_i[7:0], dat_i[7:0]} : 0)
+				 | ((mt0 & send_hword) ? dat_i[15:0] : 0)
 				 | (mt1 ? dat_i[31:16] : 0)
 				 | (mt2 ? dat_i[47:32] : 0)
 				 | (mt3 ? dat_i[63:48] : 0);
 	assign		wbmstb_o = mt0 | mt1 | mt2 | mt3;
 	assign		wbmwe_o = wbmstb_o ? we_i : 0;
-	assign		wbmsel_o = wbmstb_o ? 2'b11 : 0;
+	assign		wbmsel_o = wbmstb_o ? sel_i : 0;
 
 	assign		wbmcyc_o = st0 | st1 | st2 | st3;
 
@@ -87,7 +93,10 @@ module lsu(
 			if(hword_i || word_i) begin
 				dat_o <= 0;
 			end
-			if(st0 & wbmack_i) begin
+			if(st0 & wbmack_i & send_low_byte) begin
+				dat_o[7:0] <= wbmdat_i[7:0];
+			end
+			if(st0 & wbmack_i & send_hword) begin
 				dat_o[15:0] <= wbmdat_i;
 			end
 			if(st1 & wbmack_i) begin
