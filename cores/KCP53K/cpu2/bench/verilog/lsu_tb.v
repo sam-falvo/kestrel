@@ -5,7 +5,8 @@
 module lsu_tb();
 	reg	[11:0]	story_to;
 	reg		fault_to;
-	reg		clk_i, reset_i, we_i, nomem_i, hword_i, word_i, dword_i;
+	reg		clk_i, reset_i, we_i, nomem_i, hword_i, word_i;
+	reg		dword_i;
 	reg	[63:0]	addr_i, dat_i;
 	reg	[1:0]	sel_i;
 
@@ -16,7 +17,7 @@ module lsu_tb();
 	wire	[15:0]	wbmdat_o;
 	wire		wbmwe_o, wbmstb_o;
 	wire	[1:0]	wbmsel_o;
-	reg		wbmack_i;
+	reg		wbmack_i, wbmstall_i;
 	reg	[15:0]	wbmdat_i;
 
 	lsu ls(
@@ -40,6 +41,7 @@ module lsu_tb();
 		.wbmstb_o(wbmstb_o),
 		.wbmsel_o(wbmsel_o),
 		.wbmack_i(wbmack_i),
+		.wbmstall_i(wbmstall_i),
 		.wbmdat_i(wbmdat_i)
 	);
 
@@ -71,7 +73,8 @@ module lsu_tb();
 
 		{
 		  wbmack_i, addr_i, dat_i, we_i, nomem_i, hword_i, word_i,
-		  dword_i, clk_i, reset_i, story_to, fault_to, sel_i
+		  dword_i, clk_i, reset_i, story_to, fault_to, sel_i,
+		  wbmstall_i
 		} <= 0;
 
 		wait(~clk_i); wait(clk_i); #1;
@@ -471,6 +474,120 @@ module lsu_tb();
 
 		assert_rwe(0);
 		assert_dat(64'hDEADBEEFFEEDFACE);
+
+		// The STALL_I signal is required to slow down the command-
+		// phase of bus transactions.  We repeat a 64-bit transaction
+		// here, but stall for 3 cycles mid-way.
+
+		story_to <= 12'h0B0;
+
+		dword_i <= 1;
+		addr_i <= 64'h1122334455667788;
+		dat_i <= 64'h7766554433221100;
+		we_i <= 1;
+		sel_i <= 2'b11;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		dword_i <= 0;
+
+		assert_busy(1);
+		assert_wbmadr(64'h112233445566778E);
+		assert_wbmdat(16'h7766);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(0);
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmadr(64'h112233445566778C);
+		assert_wbmdat(16'h5544);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(0);
+
+		wbmack_i <= 1;
+		wbmdat_i <= 16'hFEED;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmadr(64'h112233445566778A);
+		assert_wbmdat(16'h3322);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(0);
+
+		wbmstall_i <= 1;
+		wbmack_i <= 0;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmadr(64'h112233445566778A);
+		assert_wbmdat(16'h3322);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(0);
+
+		wbmstall_i <= 1;
+		wbmack_i <= 0;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmadr(64'h112233445566778A);
+		assert_wbmdat(16'h3322);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(0);
+
+		wbmstall_i <= 1;
+		wbmack_i <= 0;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmadr(64'h112233445566778A);
+		assert_wbmdat(16'h3322);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(0);
+
+		wbmstall_i <= 0;
+		wbmack_i <= 1;
+		wbmdat_i <= 16'hFACE;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmadr(64'h1122334455667788);
+		assert_wbmdat(16'h1100);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(0);
+
+		wbmdat_i <= 16'h00C0;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		wbmdat_i <= 16'hFFEE;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		wbmack_i <= 0;
+		wbmdat_i <= 0;
+
+		assert_rwe(0);
+		assert_dat(64'hFEEDFACE00C0FFEE);
 
 		#100;
 		$stop;

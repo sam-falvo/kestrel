@@ -22,6 +22,7 @@ module lsu(
 	output		wbmstb_o,
 	output		wbmcyc_o,
 	output	[1:0]	wbmsel_o,
+	input		wbmstall_i,
 	input		wbmack_i,
 	input	[15:0]	wbmdat_i
 );
@@ -42,10 +43,10 @@ module lsu(
 	wire		send_high_byte = sel_i == 2'b10;
 	wire		send_hword = sel_i == 2'b11;
 
-	wire		next_mt0 = hword_i | mt1;
-	wire		next_mt1 = word_i | mt2;
-	wire		next_mt2 = mt3;
-	wire		next_mt3 = dword_i;
+	wire		next_mt0 = ~wbmstall_i ? (hword_i | mt1) : mt0;
+	wire		next_mt1 = ~wbmstall_i ? (word_i | mt2) : mt1;
+	wire		next_mt2 = ~wbmstall_i ? mt3 : mt2;
+	wire		next_mt3 = ~wbmstall_i ? dword_i : mt3;
 
 	wire		next_st0 = hword_i | (st0 & ~wbmack_i) | st1;
 	wire		next_st1 = word_i | (st1 & ~wbmack_i) | st2;
