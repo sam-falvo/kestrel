@@ -8,6 +8,7 @@ module lsu(
 	input		we_i,
 	input		nomem_i,
 	input		hword_i,
+	input		word_i,
 	output		busy_o,
 	output		rwe_o,
 	output	[63:0]	dat_o,
@@ -35,19 +36,21 @@ module lsu(
 	reg		st0, st1, st2, st3;	// Slave timeslots
 
 	wire		next_mt0 = hword_i | mt1;
-	wire		next_mt1 = mt2;
+	wire		next_mt1 = word_i | mt2;
 	wire		next_mt2 = mt3;
 	wire		next_mt3 = 0;
 
 	wire		next_st0 = hword_i | (st0 & ~wbmack_i) | st1;
-	wire		next_st1 = (st1 & ~wbmack_i) | st2;
+	wire		next_st1 = word_i | (st1 & ~wbmack_i) | st2;
 	wire		next_st2 = (st2 & ~wbmack_i) | st3;
 	wire		next_st3 = st3 & ~wbmack_i;
 
-	assign		wbmadr_o = mt0 ? {addr_i[63:1], 1'b0} : 0;
-	assign		wbmdat_o = mt0 ? dat_i[15:0] : 0;
-	assign		wbmwe_o = mt0 ? we_i : 0;
-	assign		wbmstb_o = mt0;
+	assign		wbmadr_o = (mt0 ? {addr_i[63:1], 1'b0} : 0)
+				 | (mt1 ? {addr_i[63:2], 2'b10} : 0);
+	assign		wbmdat_o = (mt0 ? dat_i[15:0] : 0)
+				 | (mt1 ? dat_i[31:16] : 0);
+	assign		wbmstb_o = mt0 | mt1 | mt2 | mt3;
+	assign		wbmwe_o = wbmstb_o ? we_i : 0;
 
 	assign		wbmcyc_o = st0 | st1 | st2 | st3;
 
@@ -74,8 +77,20 @@ module lsu(
 				dat_o <= addr_i;
 				rwe_o <= 1;
 			end
+			if(hword_i || word_i) begin
+				dat_o <= 0;
+			end
 			if(st0 & wbmack_i) begin
-				dat_o <= {{48{wbmdat_i[15]}}, wbmdat_i};
+				dat_o[15:0] <= wbmdat_i;
+			end
+			if(st1 & wbmack_i) begin
+				dat_o[31:16] <= wbmdat_i;
+			end
+			if(st2 & wbmack_i) begin
+				dat_o[47:32] <= wbmdat_i;
+			end
+			if(st3 & wbmack_i) begin
+				dat_o[63:48] <= wbmdat_i;
 			end
 		end
 	end
