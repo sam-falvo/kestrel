@@ -400,6 +400,77 @@ module lsu_tb();
 
 		wbmack_i <= 0;
 
+		// So far, all tests have exercised separated cycles for
+		// bus commands and bus responses.  But, these operate over
+		// independent sub-buses, so it should be possible to overlap
+		// their operation.  The perfect, most ideal case would be
+		// single-cycle response times.
+
+		story_to <= 12'h0A0;
+
+		dword_i <= 1;
+		addr_i <= 64'h1122334455667788;
+		dat_i <= 64'h7766554433221100;
+		we_i <= 1;
+		sel_i <= 2'b11;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		dword_i <= 0;
+
+		assert_busy(1);
+		assert_wbmadr(64'h112233445566778E);
+		assert_wbmdat(16'h7766);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(0);
+
+		wbmack_i <= 1;
+		wbmdat_i <= 16'hDEAD;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmadr(64'h112233445566778C);
+		assert_wbmdat(16'h5544);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(0);
+
+		wbmdat_i <= 16'hBEEF;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmadr(64'h112233445566778A);
+		assert_wbmdat(16'h3322);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(0);
+
+		wbmdat_i <= 16'hFEED;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmadr(64'h1122334455667788);
+		assert_wbmdat(16'h1100);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(0);
+
+		wbmdat_i <= 16'hFACE;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		wbmack_i <= 0;
+
+		assert_rwe(0);
+		assert_dat(64'hDEADBEEFFEEDFACE);
 
 		#100;
 		$stop;
