@@ -20,6 +20,7 @@ module lsu(
 	output		wbmwe_o,
 	output		wbmstb_o,
 	output		wbmcyc_o,
+	output	[1:0]	wbmsel_o,
 	input		wbmack_i,
 	input	[15:0]	wbmdat_i
 );
@@ -56,6 +57,7 @@ module lsu(
 				 | (mt3 ? dat_i[63:48] : 0);
 	assign		wbmstb_o = mt0 | mt1 | mt2 | mt3;
 	assign		wbmwe_o = wbmstb_o ? we_i : 0;
+	assign		wbmsel_o = wbmstb_o ? 2'b11 : 0;
 
 	assign		wbmcyc_o = st0 | st1 | st2 | st3;
 
