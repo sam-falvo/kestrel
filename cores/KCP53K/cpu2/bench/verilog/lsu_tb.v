@@ -361,8 +361,45 @@ module lsu_tb();
 
 		wbmack_i <= 0;
 
-
 		// These tests exercise the upper byte.
+
+		story_to <= 12'h088;
+
+		hword_i <= 1;
+		sel_i <= 2'b10;
+		addr_i <= 64'h1122334455667788;
+		dat_i <= 64'h77665544332211A5;
+		we_i <= 1;
+		wbmdat_i <= 16'hDEAD;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		hword_i <= 0;
+
+		assert_busy(1);
+		assert_wbmadr(64'h1122334455667788);
+		assert_wbmdat(16'hA5A5);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b10);
+		assert_rwe(0);
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmstb(0);
+		assert_wbmsel(2'b00);
+		assert_rwe(0);
+		
+		wbmack_i <= 1;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_rwe(0);
+		assert_dat(64'h00000000000000DE);
+
+		wbmack_i <= 0;
+
 
 		#100;
 		$stop;

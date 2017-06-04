@@ -39,6 +39,7 @@ module lsu(
 	reg		st0, st1, st2, st3;	// Slave timeslots
 
 	wire		send_low_byte = sel_i == 2'b01;
+	wire		send_high_byte = sel_i == 2'b10;
 	wire		send_hword = sel_i == 2'b11;
 
 	wire		next_mt0 = hword_i | mt1;
@@ -51,12 +52,16 @@ module lsu(
 	wire		next_st2 = (st2 & ~wbmack_i) | st3;
 	wire		next_st3 = dword_i | (st3 & ~wbmack_i);
 
+	wire	[15:0]	byte_data = {dat_i[7:0], dat_i[7:0]};
+
 	assign		wbmadr_o = ((mt0 & send_low_byte) ? addr_i : 0)
+				 | ((mt0 & send_high_byte) ? addr_i : 0)
 				 | ((mt0 & send_hword) ? {addr_i[63:1], 1'b0} : 0)
 				 | (mt1 ? {addr_i[63:2], 2'b10} : 0)
 				 | (mt2 ? {addr_i[63:3], 3'b100} : 0)
 				 | (mt3 ? {addr_i[63:3], 3'b110} : 0);
-	assign		wbmdat_o = ((mt0 & send_low_byte) ? {dat_i[7:0], dat_i[7:0]} : 0)
+	assign		wbmdat_o = ((mt0 & send_low_byte) ? byte_data : 0)
+				 | ((mt0 & send_high_byte) ? byte_data : 0)
 				 | ((mt0 & send_hword) ? dat_i[15:0] : 0)
 				 | (mt1 ? dat_i[31:16] : 0)
 				 | (mt2 ? dat_i[47:32] : 0)
@@ -95,6 +100,9 @@ module lsu(
 			end
 			if(st0 & wbmack_i & send_low_byte) begin
 				dat_o[7:0] <= wbmdat_i[7:0];
+			end
+			if(st0 & wbmack_i & send_high_byte) begin
+				dat_o[7:0] <= wbmdat_i[15:8];
 			end
 			if(st0 & wbmack_i & send_hword) begin
 				dat_o[15:0] <= wbmdat_i;
