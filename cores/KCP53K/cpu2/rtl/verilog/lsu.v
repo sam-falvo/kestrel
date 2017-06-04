@@ -95,7 +95,7 @@ module lsu(
 				dat_o <= addr_i;
 				rwe_o <= 1;
 			end
-			if(hword_i || word_i) begin
+			if(hword_i || word_i || dword_i) begin
 				dat_o <= 0;
 			end
 			if(st0 & wbmack_i & send_low_byte) begin
