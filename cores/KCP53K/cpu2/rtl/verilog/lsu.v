@@ -1,6 +1,97 @@
 `default_nettype none
 `timescale 1ns / 1ps
 
+//
+// Signal Descriptions
+// ===================
+//
+// clk_i	Processor clock (also Wishbone's clock).
+// reset_i	1 to reset the circuit in the next cycle.
+//		0 for normal operation.
+//
+// Inputs from execute stage:
+//
+// addr_i	Address to read from or write to in memory.
+//		Typically hardwired to the output of the ALU.
+//
+// we_i		1 for write transaction; 0 for read.  Ignored
+//		if no memory operation is requested; see
+//		hword_i, word_i, and dword_i below.
+//
+//		we_i MUST remain valid throughout the complete
+//		Wishbone command phase.  This might change in the
+//		future.
+//
+// nomem_i	1 if the value presented to addr_i is intended
+//		to be written back to the register file.
+//		Mutually exclusive with hword_i, word_i, and
+//		dword_i.
+//
+// hword_i
+// word_i
+// dword_i	1 to request one of 8-bit (hword_i), 16-bit
+//		(hword_i), 32-bit (word_i), or 64-bit (dword_i)
+//		transfers.  Mutually exclusive with each other
+//		and with nomem_i.
+//
+//		When the transfer completes, rwe_o will be pulsed.
+//		dat_o will hold whatever value was read off of
+//		the Wishbone interconnect, which may well be
+//		undefined if we_i is was set in conjunction with these
+//		command strobes.
+//
+//		At least one of nomem_i, hword_i, word_i, or dword_i
+//		should be asserted every idle clock cycle.  If none are
+//		asserted, the register write-back stage of the pipeline
+//		will receive a bubble in the next cycle.
+//
+// dat_i	If one of hword_i, word_i, or dword_i signals the
+//		start of a Wishbone transaction, this signal contains
+//		the value to be written out over wbmdat_o.
+//		Ignored otherwise.
+//
+// sel_i	Byte lane select signals.  sel_i[1] selects the upper-half
+//		of the data bus, while sel_i[0] selects the lower-half.
+//		Ignored if no memory operation is requested.
+//		Otherwise, passed through to wbmsel_o during bus command
+//		phases.
+//
+//		For word_i and dword_i transfers, sel_i MUST be 2'b11.
+//		For hword_i transfers, it may take on one of three valid
+//		values:
+//
+//		2'b11	16-bit half-word transfer.
+//		2'b10	8-bit byte transfer.
+//		2'b01	8-bit byte transfer.
+//		2'b00	Undefined behavior.
+//
+//		sel_i MUST remain valid throughout the complete Wishbone
+//		command phase.  This might change in the future.
+//
+// Outputs to Register Write-Back Stage:
+//
+// rwe_o	Pulsed for a single cycle when dat_o holds valid data.
+//		Responsibility for zero- or sign-extension lies with
+//		the next stage.
+//
+// dat_o	In the absence of a Wishbone transaction, this reflects
+//		the addr_i input.  For all Wishbone transactions, this
+//		signal holds the value read off of the Wishbone interconnect.
+//		dat_o is valid if, and only if, rwe_o is asserted.
+//
+// Outputs to Random Control Logic:
+//
+// busy_o	Mirrors wbmcyc_o; indicates whether or not a bus transaction
+//		is in progress.  This signal can be used to stall the
+//		integer pipeline until the transfer has been completed.
+//
+// Wishbone Master Signals:
+//
+// wbmcyc_o	See Wishbone B.4 Pipelined Mode specifications.
+// wbmadr_o
+// etc.
+//
+
 module lsu(
 	input		clk_i,
 	input		reset_i,
