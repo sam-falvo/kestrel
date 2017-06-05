@@ -48,9 +48,9 @@ module lsu(
 	wire		next_mt2 = ~wbmstall_i ? mt3 : mt2;
 	wire		next_mt3 = ~wbmstall_i ? dword_i : mt3;
 
-	wire		next_st0 = hword_i | (st0 & ~wbmack_i) | st1;
-	wire		next_st1 = word_i | (st1 & ~wbmack_i) | st2;
-	wire		next_st2 = (st2 & ~wbmack_i) | st3;
+	wire		next_st0 = hword_i | (st0 & ~wbmack_i) | (st1 & wbmack_i);
+	wire		next_st1 = word_i | (st1 & ~wbmack_i) | (st2 & wbmack_i);
+	wire		next_st2 = (st2 & ~wbmack_i) | (st3 & wbmack_i);
 	wire		next_st3 = dword_i | (st3 & ~wbmack_i);
 
 	wire	[15:0]	byte_data = {dat_i[7:0], dat_i[7:0]};
@@ -101,12 +101,15 @@ module lsu(
 			end
 			if(st0 & wbmack_i & send_low_byte) begin
 				dat_o[7:0] <= wbmdat_i[7:0];
+				rwe_o <= 1;
 			end
 			if(st0 & wbmack_i & send_high_byte) begin
 				dat_o[7:0] <= wbmdat_i[15:8];
+				rwe_o <= 1;
 			end
 			if(st0 & wbmack_i & send_hword) begin
 				dat_o[15:0] <= wbmdat_i;
+				rwe_o <= 1;
 			end
 			if(st1 & wbmack_i) begin
 				dat_o[31:16] <= wbmdat_i;

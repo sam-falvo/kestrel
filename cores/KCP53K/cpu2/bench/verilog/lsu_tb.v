@@ -164,7 +164,7 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		assert_rwe(0);
+		assert_rwe(1);
 		assert_dat(64'h000000000000DEAD);
 
 		wbmack_i <= 0;
@@ -221,7 +221,7 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		assert_rwe(0);
+		assert_rwe(1);
 		assert_dat(64'h00000000DEADBEEF);
 
 		wbmack_i <= 0;
@@ -304,7 +304,7 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		assert_rwe(0);
+		assert_rwe(1);
 		assert_dat(64'hDEADBEEF0BADC0DE);
 
 		wbmack_i <= 0;
@@ -359,7 +359,7 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		assert_rwe(0);
+		assert_rwe(1);
 		assert_dat(64'h00000000000000AD);
 
 		wbmack_i <= 0;
@@ -398,7 +398,7 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		assert_rwe(0);
+		assert_rwe(1);
 		assert_dat(64'h00000000000000DE);
 
 		wbmack_i <= 0;
@@ -472,7 +472,7 @@ module lsu_tb();
 
 		wbmack_i <= 0;
 
-		assert_rwe(0);
+		assert_rwe(1);
 		assert_dat(64'hDEADBEEFFEEDFACE);
 
 		// The STALL_I signal is required to slow down the command-
@@ -586,7 +586,7 @@ module lsu_tb();
 		wbmack_i <= 0;
 		wbmdat_i <= 0;
 
-		assert_rwe(0);
+		assert_rwe(1);
 		assert_dat(64'hFEEDFACE00C0FFEE);
 
 		#100;
