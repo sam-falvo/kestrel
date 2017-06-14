@@ -88,6 +88,116 @@ module xrs_tb();
 		assert_rdata(64'h0);
 		assert_rdatb(64'h7766554433221100);
 
+		// Confirm operation of sign-extension
+
+		rdat_i <= 64'h7766554433221100;
+		rsx8_i <= 1;
+		rd_i <= 1;
+		wait(~clk_i); wait(clk_i); #1;
+
+		rsx8_i <= 0;
+		rsx16_i <= 1;
+		rd_i <= 2;
+		wait(~clk_i); wait(clk_i); #1;
+
+		rsx16_i <= 0;
+		rsx32_i <= 1;
+		rd_i <= 3;
+		wait(~clk_i); wait(clk_i); #1;
+
+		rsx32_i <= 0;
+		rsx64_i <= 1;
+		rd_i <= 4;
+		wait(~clk_i); wait(clk_i); #1;
+
+		rsx64_i <= 0;
+
+		rdat_i <= 64'h8766554483228180;
+		rsx8_i <= 1;
+		rd_i <= 5;
+		wait(~clk_i); wait(clk_i); #1;
+
+		rsx8_i <= 0;
+		rsx16_i <= 1;
+		rd_i <= 6;
+		wait(~clk_i); wait(clk_i); #1;
+
+		rsx16_i <= 0;
+		rsx32_i <= 1;
+		rd_i <= 7;
+		wait(~clk_i); wait(clk_i); #1;
+
+		rsx32_i <= 0;
+		rsx64_i <= 1;
+		rd_i <= 8;
+		wait(~clk_i); wait(clk_i); #1;
+
+		rsx64_i <= 0;
+
+		ra_i <= 1;
+		wait(~clk_i); wait(clk_i); #1;
+		assert_rdata(64'h0000000000000000);
+
+		ra_i <= 2;
+		wait(~clk_i); wait(clk_i); #1;
+		assert_rdata(64'h0000000000001100);
+
+		ra_i <= 3;
+		wait(~clk_i); wait(clk_i); #1;
+		assert_rdata(64'h0000000033221100);
+
+		ra_i <= 4;
+		wait(~clk_i); wait(clk_i); #1;
+		assert_rdata(64'h7766554433221100);
+
+		ra_i <= 5;
+		wait(~clk_i); wait(clk_i); #1;
+		assert_rdata(64'hFFFFFFFFFFFFFF80);
+
+		ra_i <= 6;
+		wait(~clk_i); wait(clk_i); #1;
+		assert_rdata(64'hFFFFFFFFFFFF8180);
+
+		ra_i <= 7;
+		wait(~clk_i); wait(clk_i); #1;
+		assert_rdata(64'hFFFFFFFF83228180);
+
+		ra_i <= 8;
+		wait(~clk_i); wait(clk_i); #1;
+		assert_rdata(64'h8766554483228180);
+
+		// Confirm operation of zero-extension
+
+		rdat_i <= 64'hFFFFFFFFFFFFFFFF;
+		rzx8_i <= 1;
+		rd_i <= 1;
+		wait(~clk_i); wait(clk_i); #1;
+
+		rzx8_i <= 0;
+		rzx16_i <= 1;
+		rd_i <= 2;
+		wait(~clk_i); wait(clk_i); #1;
+
+		rzx16_i <= 0;
+		rzx32_i <= 1;
+		rd_i <= 3;
+		wait(~clk_i); wait(clk_i); #1;
+
+		rzx32_i <= 0;
+
+		ra_i <= 1;
+		wait(~clk_i); wait(clk_i); #1;
+		assert_rdata(64'h00000000000000FF);
+
+		ra_i <= 2;
+		wait(~clk_i); wait(clk_i); #1;
+		assert_rdata(64'h000000000000FFFF);
+
+		ra_i <= 3;
+		wait(~clk_i); wait(clk_i); #1;
+		assert_rdata(64'h00000000FFFFFFFF);
+
+
 		#100;
 		$stop;
 	end
