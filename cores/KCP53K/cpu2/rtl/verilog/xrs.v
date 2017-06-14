@@ -9,6 +9,24 @@
 // edge.
 //
 // This module assumes you're targeting the iCE40HX series of FPGAs.
+//
+// Signal Descriptions
+// ===================
+//
+// clk_i	Processor clock (also Wishbone's clock).
+//
+// rd_i		Destination register address (0-31).
+// rdat_i	64-bit data word to write to the destination register.
+// rwe_i	1 to allow writes to the specified register; 0 to NOT write.
+//		Note that pulling this signal to 0 is equivalent to
+//		forcing rd_i to 0.
+//
+// ra_i		Source register addresses (0-31).
+// rb_i
+//
+// rdata_o	64-bit value currently stored at the specified register
+// rdatb_o	address.  Note that register 0 is hardwired to the value 0.
+//
 
 module xrs(
 	input		clk_i,
