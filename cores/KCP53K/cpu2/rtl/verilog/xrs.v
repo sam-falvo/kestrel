@@ -17,9 +17,22 @@
 //
 // rd_i		Destination register address (0-31).
 // rdat_i	64-bit data word to write to the destination register.
-// rwe_i	1 to allow writes to the specified register; 0 to NOT write.
-//		Note that pulling this signal to 0 is equivalent to
-//		forcing rd_i to 0.
+//		This value may be sign or zero extended as per the write-
+//		enables below.
+//
+// rsx8_i	1 allows the register bank to store the specified sign-
+// rsx16_i	extended value on rdat_i into the register addressed by
+// rsx32_i	rd_i.
+// rsx64_i
+//
+// rzx8_i	1 allows the register bank to store the specified ZERO-
+// rzx16_i	extended value on rdat_i into the register addressed by
+// rzx32_i	rd_i.
+//
+//		Note: if none of the rsxN_i bits are set, and none of the
+//		rzxN_i bits are set, then no value is stored into the
+//		register set.  This is indistinguishable from forcing rd_i
+//		equal to 0.
 //
 // ra_i		Source register addresses (0-31).
 // rb_i
@@ -32,13 +45,29 @@ module xrs(
 	input		clk_i,
 	input	[4:0]	rd_i,
 	input	[63:0]	rdat_i,
-	input		rwe_i,
+	input		rzx8_i,
+	input		rzx16_i,
+	input		rzx32_i,
+	input		rsx8_i,
+	input		rsx16_i,
+	input		rsx32_i,
+	input		rsx64_i,
 
 	output	[63:0]	rdata_o,
 	output	[63:0]	rdatb_o,
 	input	[4:0]	ra_i,
 	input	[4:0]	rb_i
 );
+	wire	[63:0]	rx_dat  = (rzx8_i ? {56'd0, rdat_i[7:0]} : 0)
+				| (rzx16_i ? {48'd0, rdat_i[15:0]} : 0)
+				| (rzx32_i ? {32'd0, rdat_i[31:0]} : 0)
+				| (rsx8_i ? {{56{rdat_i[7]}}, rdat_i[7:0]} : 0)
+				| (rsx16_i ? {{48{rdat_i[15]}}, rdat_i[15:0]} : 0)
+				| (rsx32_i ? {{32{rdat_i[31]}}, rdat_i[31:0]} : 0)
+				| (rsx64_i ? rdat_i : 0)
+				;
+	wire	rwe_i = |{rzx8_i, rzx16_i, rzx32_i, rsx8_i, rsx16_i, rsx32_i, rsx64_i};
+
 	wire	[63:0]	data_o, datb_o;
 	reg	[4:0]	ra_r, rb_r;
 
@@ -51,7 +80,7 @@ module xrs(
 	end
 
 	ram64b port0(
-		.wdata(rdat_i),
+		.wdata(rx_dat),
 		.wen(rwe_i),
 		.waddr(rd_i),
 		.wclk(clk_i),
@@ -61,7 +90,7 @@ module xrs(
 	);
 
 	ram64b port1(
-		.wdata(rdat_i),
+		.wdata(rx_dat),
 		.wen(rwe_i),
 		.waddr(rd_i),
 		.wclk(clk_i),

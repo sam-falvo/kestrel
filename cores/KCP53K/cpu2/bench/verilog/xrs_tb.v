@@ -6,7 +6,9 @@ module xrs_tb();
 	reg	[11:0]	story_to;
 	reg		fault_to;
 
-	reg		clk_i, rwe_i;
+	reg		clk_i;
+	reg		rsx8_i, rsx16_i, rsx32_i, rsx64_i;
+	reg		rzx8_i, rzx16_i, rzx32_i;
 	reg	[4:0]	ra_i, rb_i, rd_i;
 	reg	[63:0]	rdat_i;
 	wire	[63:0]	rdata_o, rdatb_o;
@@ -20,7 +22,13 @@ module xrs_tb();
 
 		.rd_i(rd_i),
 		.rdat_i(rdat_i),
-		.rwe_i(rwe_i),
+		.rsx8_i(rsx8_i),
+		.rsx16_i(rsx16_i),
+		.rsx32_i(rsx32_i),
+		.rsx64_i(rsx64_i),
+		.rzx8_i(rzx8_i),
+		.rzx16_i(rzx16_i),
+		.rzx32_i(rzx32_i),
 
 		.rdata_o(rdata_o),
 		.rdatb_o(rdatb_o),
@@ -36,12 +44,16 @@ module xrs_tb();
 		$dumpfile("xrs.vcd");
 		$dumpvars;
 
-		{story_to, fault_to, clk_i, rwe_i, ra_i, rb_i, rd_i, rdat_i} <= 0;
+		{
+			story_to, fault_to, clk_i, rzx8_i, rzx16_i, rzx32_i,
+			rsx8_i, rsx16_i, rsx32_i, rsx64_i, ra_i, rb_i, rd_i,
+			rdat_i
+		} <= 0;
 		wait(~clk_i); wait(clk_i); #1;
 
 		// Try to store some values in the register file.
 		rdat_i <= 64'h1122334455667788;
-		rwe_i <= 1;
+		rsx64_i <= 1;
 		rd_i <= 1;
 		wait(~clk_i); wait(clk_i); #1;
 
@@ -49,7 +61,7 @@ module xrs_tb();
 		rd_i <= 2;
 		wait(~clk_i); wait(clk_i); #1;
 
-		rwe_i <= 0;
+		rsx64_i <= 0;
 
 		// Now try to read back the registers we just wrote.
 		ra_i <= 1;
