@@ -6,10 +6,10 @@ help:
 	@echo
 
 xrs.waves:
-	iverilog -s xrs_tb ../../common/*.v bench/verilog/*.v rtl/verilog/*.v -I../../common && vvp -n a.out && gtkwave xrs.vcd
+	iverilog -s xrs_tb ../../common/*.v bench/verilog/*.v rtl/verilog/*.v -Iinclude/verilog -I../../common && vvp -n a.out && gtkwave xrs.vcd
 
 lsu.waves:
-	iverilog -s lsu_tb ../../common/*.v bench/verilog/*.v rtl/verilog/*.v -I../../common && vvp -n a.out && gtkwave lsu.vcd
+	iverilog -s lsu_tb ../../common/*.v bench/verilog/*.v rtl/verilog/*.v -Iinclude/verilog -I../../common && vvp -n a.out && gtkwave lsu.vcd
 
 clean:
 	rm -f *.blif *.asc *.bin *.vcd a.out
