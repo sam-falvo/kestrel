@@ -143,10 +143,10 @@ module lsu(
 
 	// Note that we take inputs from byte_i..dword_i, NOT
 	// byte_r..dword_r.  This reduces our cycle time by one cycle.
-	wire		next_mt0 = ~wbmstall_i ? (hword_i | byte_i | mt1) : mt0;
-	wire		next_mt1 = ~wbmstall_i ? (word_i | mt2) : mt1;
+	wire		next_mt0 = hword_i | byte_i | (~wbmstall_i ? mt1 : mt0);
+	wire		next_mt1 = word_i | (~wbmstall_i ? mt2 : mt1);
 	wire		next_mt2 = ~wbmstall_i ? mt3 : mt2;
-	wire		next_mt3 = ~wbmstall_i ? dword_i : mt3;
+	wire		next_mt3 = dword_i | (~wbmstall_i ? 0 : mt3);
 
 	wire		next_st0 = hword_i | byte_i | (st0 & ~wbmack_i) | (st1 & wbmack_i);
 	wire		next_st1 = word_i | (st1 & ~wbmack_i) | (st2 & wbmack_i);
