@@ -1,16 +1,19 @@
 `default_nettype none
 `timescale 1ns / 1ps
+
 `include "asserts.vh"
+`include "xrs.vh"
 
 module lsu_tb();
 	reg	[11:0]	story_to;
 	reg		fault_to;
-	reg		clk_i, reset_i, we_i, nomem_i, hword_i, word_i;
-	reg		dword_i;
+	reg		clk_i, reset_i, we_i, nomem_i;
+	reg		byte_i, hword_i, word_i, dword_i;
 	reg	[63:0]	addr_i, dat_i;
 	reg	[1:0]	sel_i;
 
-	wire		busy_o, rwe_o;
+	wire		busy_o;
+	wire	[2:0]	rwe_o;
 	wire	[63:0]	dat_o;
 
 	wire	[63:0]	wbmadr_o;
@@ -26,6 +29,7 @@ module lsu_tb();
 		.addr_i(addr_i),
 		.we_i(we_i),
 		.nomem_i(nomem_i),
+		.byte_i(byte_i),
 		.hword_i(hword_i),
 		.word_i(word_i),
 		.dword_i(dword_i),
@@ -47,7 +51,7 @@ module lsu_tb();
 
 	`STANDARD_FAULT
 	`DEFASSERT0(busy, o)
-	`DEFASSERT0(rwe, o)
+	`DEFASSERT(rwe, 2, o)
 	`DEFASSERT(dat, 63, o)
 	`DEFASSERT(wbmadr, 63, o)
 	`DEFASSERT(wbmdat, 15, o)
@@ -74,7 +78,7 @@ module lsu_tb();
 		{
 		  wbmack_i, addr_i, dat_i, we_i, nomem_i, hword_i, word_i,
 		  dword_i, clk_i, reset_i, story_to, fault_to, sel_i,
-		  wbmstall_i
+		  wbmstall_i, byte_i
 		} <= 0;
 
 		wait(~clk_i); wait(clk_i); #1;
@@ -99,7 +103,7 @@ module lsu_tb();
 		nomem_i <= 1;
 		wait(~clk_i); wait(clk_i); #1;
 		assert_dat(64'h1122334455667788);
-		assert_rwe(1);
+		assert_rwe(`XRS_RWE_S64);
 
 		story_to <= 12'h018;
 
@@ -109,7 +113,7 @@ module lsu_tb();
 		nomem_i <= 1;
 		wait(~clk_i); wait(clk_i); #1;
 		assert_dat(64'h1122334455667788);
-		assert_rwe(1);
+		assert_rwe(`XRS_RWE_S64);
 
 		we_i <= 0;
 		sel_i <= 0;
@@ -121,7 +125,7 @@ module lsu_tb();
 
 		nomem_i <= 0;
 		wait(~clk_i); wait(clk_i); #1;
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		// When writing a half-word to memory,
 		// the LSU must initiate and wait for the complete
@@ -157,20 +161,20 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wait(~clk_i); wait(clk_i); #1;
 
 		assert_busy(1);
 		assert_wbmstb(0);
 		assert_wbmsel(2'b00);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 		
 		wbmack_i <= 1;
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		assert_rwe(1);
+		assert_rwe(`XRS_RWE_S16);
 		assert_dat(64'h000000000000DEAD);
 
 		wbmack_i <= 0;
@@ -202,7 +206,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wait(~clk_i); wait(clk_i); #1;
 
@@ -212,14 +216,14 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wait(~clk_i); wait(clk_i); #1;
 
 		assert_busy(1);
 		assert_wbmstb(0);
 		assert_wbmsel(2'b00);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 		
 		wbmack_i <= 1;
 		wbmdat_i <= 16'hDEAD;
@@ -230,7 +234,7 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		assert_rwe(1);
+		assert_rwe(`XRS_RWE_S32);
 		assert_dat(64'h00000000DEADBEEF);
 
 		wbmack_i <= 0;
@@ -260,7 +264,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wait(~clk_i); wait(clk_i); #1;
 
@@ -270,7 +274,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wait(~clk_i); wait(clk_i); #1;
 
@@ -280,7 +284,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wait(~clk_i); wait(clk_i); #1;
 
@@ -290,14 +294,14 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wait(~clk_i); wait(clk_i); #1;
 
 		assert_busy(1);
 		assert_wbmstb(0);
 		assert_wbmsel(2'b00);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 		
 		wbmack_i <= 1;
 		wbmdat_i <= 16'hDEAD;
@@ -316,7 +320,7 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		assert_rwe(1);
+		assert_rwe(`XRS_RWE_S64);
 		assert_dat(64'hDEADBEEF0BADC0DE);
 
 		wbmack_i <= 0;
@@ -341,7 +345,7 @@ module lsu_tb();
 
 		story_to <= 12'h080;
 
-		hword_i <= 1;
+		byte_i <= 1;
 		sel_i <= 2'b01;
 		addr_i <= 64'h1122334455667788;
 		dat_i <= 64'h77665544332211A5;
@@ -350,7 +354,7 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		hword_i <= 0;
+		byte_i <= 0;
 		we_i <= 0;
 		sel_i <= 0;
 
@@ -360,20 +364,20 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b01);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wait(~clk_i); wait(clk_i); #1;
 
 		assert_busy(1);
 		assert_wbmstb(0);
 		assert_wbmsel(2'b00);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 		
 		wbmack_i <= 1;
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		assert_rwe(1);
+		assert_rwe(`XRS_RWE_S8);
 		assert_dat(64'h00000000000000AD);
 
 		wbmack_i <= 0;
@@ -382,7 +386,7 @@ module lsu_tb();
 
 		story_to <= 12'h088;
 
-		hword_i <= 1;
+		byte_i <= 1;
 		sel_i <= 2'b10;
 		addr_i <= 64'h1122334455667788;
 		dat_i <= 64'h77665544332211A5;
@@ -391,7 +395,7 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		hword_i <= 0;
+		byte_i <= 0;
 		we_i <= 0;
 		sel_i <= 0;
 
@@ -401,20 +405,20 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b10);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wait(~clk_i); wait(clk_i); #1;
 
 		assert_busy(1);
 		assert_wbmstb(0);
 		assert_wbmsel(2'b00);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 		
 		wbmack_i <= 1;
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		assert_rwe(1);
+		assert_rwe(`XRS_RWE_S8);
 		assert_dat(64'h00000000000000DE);
 
 		wbmack_i <= 0;
@@ -445,7 +449,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wbmack_i <= 1;
 		wbmdat_i <= 16'hDEAD;
@@ -458,7 +462,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wbmdat_i <= 16'hBEEF;
 
@@ -470,7 +474,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wbmdat_i <= 16'hFEED;
 
@@ -482,7 +486,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wbmdat_i <= 16'hFACE;
 
@@ -490,7 +494,7 @@ module lsu_tb();
 
 		wbmack_i <= 0;
 
-		assert_rwe(1);
+		assert_rwe(`XRS_RWE_S64);
 		assert_dat(64'hDEADBEEFFEEDFACE);
 
 		// The STALL_I signal is required to slow down the command-
@@ -517,7 +521,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wait(~clk_i); wait(clk_i); #1;
 
@@ -527,7 +531,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wbmack_i <= 1;
 		wbmdat_i <= 16'hFEED;
@@ -540,7 +544,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wbmstall_i <= 1;
 		wbmack_i <= 0;
@@ -553,7 +557,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wbmstall_i <= 1;
 		wbmack_i <= 0;
@@ -566,7 +570,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wbmstall_i <= 1;
 		wbmack_i <= 0;
@@ -579,7 +583,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wbmstall_i <= 0;
 		wbmack_i <= 1;
@@ -593,7 +597,7 @@ module lsu_tb();
 		assert_wbmwe(1);
 		assert_wbmstb(1);
 		assert_wbmsel(2'b11);
-		assert_rwe(0);
+		assert_rwe(`XRS_RWE_NO);
 
 		wbmdat_i <= 16'h00C0;
 
@@ -606,7 +610,7 @@ module lsu_tb();
 		wbmack_i <= 0;
 		wbmdat_i <= 0;
 
-		assert_rwe(1);
+		assert_rwe(`XRS_RWE_S64);
 		assert_dat(64'hFEEDFACE00C0FFEE);
 
 		#100;

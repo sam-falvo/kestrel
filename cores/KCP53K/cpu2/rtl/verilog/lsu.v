@@ -24,9 +24,10 @@
 //		Mutually exclusive with hword_i, word_i, and
 //		dword_i.
 //
+// byte_i
 // hword_i
 // word_i
-// dword_i	1 to request one of 8-bit (hword_i), 16-bit
+// dword_i	1 to request one of 8-bit (byte_i), 16-bit
 //		(hword_i), 32-bit (word_i), or 64-bit (dword_i)
 //		transfers.  Mutually exclusive with each other
 //		and with nomem_i.
@@ -37,12 +38,12 @@
 //		undefined if we_i is was set in conjunction with these
 //		command strobes.
 //
-//		At least one of nomem_i, hword_i, word_i, or dword_i
+//		At least one of nomem_i, byte_i, hword_i, word_i, or dword_i
 //		should be asserted every idle clock cycle.  If none are
 //		asserted, the register write-back stage of the pipeline
 //		will receive a bubble in the next cycle.
 //
-// dat_i	If one of hword_i, word_i, or dword_i signals the
+// dat_i	If one of byte_i, hword_i, word_i, or dword_i signals the
 //		start of a Wishbone transaction, this signal contains
 //		the value to be written out over wbmdat_o.
 //		Ignored otherwise.
@@ -53,14 +54,12 @@
 //		Otherwise, passed through to wbmsel_o during bus command
 //		phases.
 //
-//		For word_i and dword_i transfers, sel_i MUST be 2'b11.
-//		For hword_i transfers, it may take on one of three valid
-//		values:
+//		For hword_i, word_i, and dword_i transfers, sel_i MUST
+//		be 2'b11.  For byte_i transfers, it may take on one of
+//		two valid values:
 //
-//		2'b11	16-bit half-word transfer.
-//		2'b10	8-bit byte transfer.
-//		2'b01	8-bit byte transfer.
-//		2'b00	Undefined behavior.
+//		2'b10	8-bit byte transfer over D8-D15.
+//		2'b01	8-bit byte transfer over D0-D7.
 //
 // Outputs to Register Write-Back Stage:
 //
@@ -92,11 +91,12 @@ module lsu(
 	input	[63:0]	addr_i,
 	input		we_i,
 	input		nomem_i,
+	input		byte_i,
 	input		hword_i,
 	input		word_i,
 	input		dword_i,
 	output		busy_o,
-	output		rwe_o,
+	output	[2:0]	rwe_o,
 	output	[63:0]	dat_o,
 	input	[63:0]	dat_i,
 	input	[1:0]	sel_i,
@@ -112,9 +112,10 @@ module lsu(
 	input	[15:0]	wbmdat_i
 );
 	reg	[63:0]	dat_o;
-	reg		rwe_o;
+	reg	[2:0]	rwe_o;
 	reg		we_r;
 	reg	[1:0]	sel_r;
+	reg		byte_r, hword_r, word_r, dword_r;
 
 	// State machine for Wishbone B.4 bus.
 	// I truly hate having to use so many MUXes and other
@@ -130,12 +131,14 @@ module lsu(
 	wire		send_high_byte = sel_r == 2'b10;
 	wire		send_hword = sel_r == 2'b11;
 
-	wire		next_mt0 = ~wbmstall_i ? (hword_i | mt1) : mt0;
+	// Note that we take inputs from byte_i..dword_i, NOT
+	// byte_r..dword_r.  This reduces our cycle time by one cycle.
+	wire		next_mt0 = ~wbmstall_i ? (hword_i | byte_i | mt1) : mt0;
 	wire		next_mt1 = ~wbmstall_i ? (word_i | mt2) : mt1;
 	wire		next_mt2 = ~wbmstall_i ? mt3 : mt2;
 	wire		next_mt3 = ~wbmstall_i ? dword_i : mt3;
 
-	wire		next_st0 = hword_i | (st0 & ~wbmack_i) | (st1 & wbmack_i);
+	wire		next_st0 = hword_i | byte_i | (st0 & ~wbmack_i) | (st1 & wbmack_i);
 	wire		next_st1 = word_i | (st1 & ~wbmack_i) | (st2 & wbmack_i);
 	wire		next_st2 = (st2 & ~wbmack_i) | (st3 & wbmack_i);
 	wire		next_st3 = dword_i | (st3 & ~wbmack_i);
@@ -165,6 +168,10 @@ module lsu(
 		rwe_o <= 0;
 		we_r <= we_r;
 		sel_r <= sel_r;
+		byte_r <= byte_r;
+		hword_r <= hword_r;
+		word_r <= word_r;
+		dword_r <= dword_r;
 
 		mt0 <= next_mt0;
 		mt1 <= next_mt1;
@@ -179,35 +186,43 @@ module lsu(
 		if(reset_i) begin
 			{dat_o, sel_r} <= 0;
 			{mt0, mt1, mt2, mt3, st0, st1, st2, st3, we_r} <= 0;
+			{byte_r, hword_r, word_r, dword_r} <= 0;
 		end
 		else begin
 			if(nomem_i) begin
 				dat_o <= addr_i;
-				rwe_o <= 1;
+				rwe_o <= `XRS_RWE_S64;
 			end
-			if(hword_i || word_i || dword_i) begin
+
+			if(byte_i || hword_i || word_i || dword_i) begin
 				dat_o <= 0;
 				we_r <= we_i;
 				sel_r <= sel_i;
+				byte_r <= byte_i;
+				hword_r <= hword_i;
+				word_r <= word_i;
+				dword_r <= dword_i;
 			end
+
 			if(st0 & wbmack_i & send_low_byte) begin
 				dat_o[7:0] <= wbmdat_i[7:0];
-				rwe_o <= 1;
 				we_r <= 0;
 				sel_r <= 0;
+				{byte_r, hword_r, word_r, dword_r} <= 0;
 			end
 			if(st0 & wbmack_i & send_high_byte) begin
 				dat_o[7:0] <= wbmdat_i[15:8];
-				rwe_o <= 1;
 				we_r <= 0;
 				sel_r <= 0;
+				{byte_r, hword_r, word_r, dword_r} <= 0;
 			end
 			if(st0 & wbmack_i & send_hword) begin
 				dat_o[15:0] <= wbmdat_i;
-				rwe_o <= 1;
 				we_r <= 0;
 				sel_r <= 0;
+				{byte_r, hword_r, word_r, dword_r} <= 0;
 			end
+
 			if(st1 & wbmack_i) begin
 				dat_o[31:16] <= wbmdat_i;
 			end
@@ -216,6 +231,19 @@ module lsu(
 			end
 			if(st3 & wbmack_i) begin
 				dat_o[63:48] <= wbmdat_i;
+			end
+
+			if(st0 & wbmack_i & byte_r) begin
+				rwe_o <= `XRS_RWE_S8;
+			end
+			if(st0 & wbmack_i & hword_r) begin
+				rwe_o <= `XRS_RWE_S16;
+			end
+			if(st0 & wbmack_i & word_r) begin
+				rwe_o <= `XRS_RWE_S32;
+			end
+			if(st0 & wbmack_i & dword_r) begin
+				rwe_o <= `XRS_RWE_S64;
 			end
 		end
 	end
