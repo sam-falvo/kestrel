@@ -13,14 +13,11 @@
 //
 // addr_i	Address to read from or write to in memory.
 //		Typically hardwired to the output of the ALU.
+//		This is a full-width integer for ease of testing.
 //
 // we_i		1 for write transaction; 0 for read.  Ignored
 //		if no memory operation is requested; see
 //		hword_i, word_i, and dword_i below.
-//
-//		we_i MUST remain valid throughout the complete
-//		Wishbone command phase.  This might change in the
-//		future.
 //
 // nomem_i	1 if the value presented to addr_i is intended
 //		to be written back to the register file.
@@ -119,6 +116,7 @@ module lsu(
 );
 	reg	[63:0]	dat_o;
 	reg		rwe_o;
+	reg		we_r;
 
 	// State machine for Wishbone B.4 bus.
 	// I truly hate having to use so many MUXes and other
@@ -159,7 +157,7 @@ module lsu(
 				 | (mt2 ? dat_i[47:32] : 0)
 				 | (mt3 ? dat_i[63:48] : 0);
 	assign		wbmstb_o = mt0 | mt1 | mt2 | mt3;
-	assign		wbmwe_o = wbmstb_o ? we_i : 0;
+	assign		wbmwe_o = wbmstb_o ? we_r : 0;
 	assign		wbmsel_o = wbmstb_o ? sel_i : 0;
 
 	assign		wbmcyc_o = st0 | st1 | st2 | st3;
@@ -167,6 +165,7 @@ module lsu(
 	always @(posedge clk_i) begin
 		dat_o <= dat_o;
 		rwe_o <= 0;
+		we_r <= we_r;
 
 		mt0 <= next_mt0;
 		mt1 <= next_mt1;
@@ -180,7 +179,7 @@ module lsu(
 
 		if(reset_i) begin
 			dat_o <= 0;
-			{mt0, mt1, mt2, mt3, st0, st1, st2, st3} <= 0;
+			{mt0, mt1, mt2, mt3, st0, st1, st2, st3, we_r} <= 0;
 		end
 		else begin
 			if(nomem_i) begin
@@ -189,18 +188,22 @@ module lsu(
 			end
 			if(hword_i || word_i || dword_i) begin
 				dat_o <= 0;
+				we_r <= we_i;
 			end
 			if(st0 & wbmack_i & send_low_byte) begin
 				dat_o[7:0] <= wbmdat_i[7:0];
 				rwe_o <= 1;
+				we_r <= 0;
 			end
 			if(st0 & wbmack_i & send_high_byte) begin
 				dat_o[7:0] <= wbmdat_i[15:8];
 				rwe_o <= 1;
+				we_r <= 0;
 			end
 			if(st0 & wbmack_i & send_hword) begin
 				dat_o[15:0] <= wbmdat_i;
 				rwe_o <= 1;
+				we_r <= 0;
 			end
 			if(st1 & wbmack_i) begin
 				dat_o[31:16] <= wbmdat_i;
