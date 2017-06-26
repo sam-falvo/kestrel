@@ -13,6 +13,8 @@
 //
 // Inputs from execute stage:
 //
+// xrs_rd_i	Destination register to write to (0 if none).
+//
 // addr_i	Address to read from or write to in memory.
 //		Typically hardwired to the output of the ALU.
 //		This is a full-width integer for ease of testing.
@@ -74,6 +76,8 @@
 //		signal holds the value read off of the Wishbone interconnect.
 //		dat_o is valid if, and only if, rwe_o is asserted.
 //
+// rd_o		Destination register to write to.
+//
 // Outputs to Random Control Logic:
 //
 // busy_o	Mirrors wbmcyc_o; indicates whether or not a bus transaction
@@ -103,6 +107,9 @@ module lsu(
 	input	[63:0]	dat_i,
 	input	[1:0]	sel_i,
 
+	input	[4:0]	xrs_rd_i,
+	output	[4:0]	rd_o,
+
 	output	[63:0]	wbmadr_o,
 	output	[15:0]	wbmdat_o,
 	output		wbmwe_o,
@@ -118,6 +125,7 @@ module lsu(
 	reg		we_r;
 	reg	[1:0]	sel_r;
 	reg		byte_r, hword_r, word_r, dword_r;
+	reg		rd_o;
 
 	// State machine for Wishbone B.4 bus.
 	// I truly hate having to use so many MUXes and other
@@ -174,6 +182,7 @@ module lsu(
 		hword_r <= hword_r;
 		word_r <= word_r;
 		dword_r <= dword_r;
+		rd_o <= rd_o;
 
 		mt0 <= next_mt0;
 		mt1 <= next_mt1;
@@ -186,7 +195,7 @@ module lsu(
 		st3 <= next_st3;
 
 		if(reset_i) begin
-			{dat_o, sel_r} <= 0;
+			{dat_o, sel_r, rd_o} <= 0;
 			{mt0, mt1, mt2, mt3, st0, st1, st2, st3, we_r} <= 0;
 			{byte_r, hword_r, word_r, dword_r} <= 0;
 		end
@@ -194,6 +203,7 @@ module lsu(
 			if(nomem_i) begin
 				dat_o <= addr_i;
 				rwe_o <= `XRS_RWE_S64;
+				rd_o <= xrs_rd_i;
 			end
 
 			if(byte_i || hword_i || word_i || dword_i) begin
@@ -204,6 +214,7 @@ module lsu(
 				hword_r <= hword_i;
 				word_r <= word_i;
 				dword_r <= dword_i;
+				rd_o <= xrs_rd_i;
 			end
 
 			if(st0 & wbmack_i & send_low_byte) begin

@@ -11,10 +11,12 @@ module lsu_tb();
 	reg		byte_i, hword_i, word_i, dword_i;
 	reg	[63:0]	addr_i, dat_i;
 	reg	[1:0]	sel_i;
+	reg	[4:0]	xrs_rd_i;
 
 	wire		busy_o;
 	wire	[2:0]	rwe_o;
 	wire	[63:0]	dat_o;
+	wire	[4:0]	rd_o;
 
 	wire	[63:0]	wbmadr_o;
 	wire	[15:0]	wbmdat_o;
@@ -39,6 +41,9 @@ module lsu_tb();
 		.dat_i(dat_i),
 		.sel_i(sel_i),
 
+		.xrs_rd_i(xrs_rd_i),
+		.rd_o(rd_o),
+
 		.wbmadr_o(wbmadr_o),
 		.wbmdat_o(wbmdat_o),
 		.wbmwe_o(wbmwe_o),
@@ -58,6 +63,7 @@ module lsu_tb();
 	`DEFASSERT(wbmsel, 1, o)
 	`DEFASSERT0(wbmwe, o)
 	`DEFASSERT0(wbmstb, o)
+	`DEFASSERT(rd, 4, o)
 
 	always begin
 		#5 clk_i <= ~clk_i;
@@ -78,7 +84,7 @@ module lsu_tb();
 		{
 		  wbmack_i, addr_i, dat_i, we_i, nomem_i, hword_i, word_i,
 		  dword_i, clk_i, reset_i, story_to, fault_to, sel_i,
-		  wbmstall_i, byte_i
+		  wbmstall_i, byte_i, xrs_rd_i
 		} <= 0;
 
 		wait(~clk_i); wait(clk_i); #1;
@@ -612,6 +618,109 @@ module lsu_tb();
 
 		assert_rwe(`XRS_RWE_S64);
 		assert_dat(64'hFEEDFACE00C0FFEE);
+
+		// When writing a value fetched from memory, we
+		// must propegate the destination register address.
+
+		story_to <= 12'h0C0;
+
+		dword_i <= 1;
+		addr_i <= 64'h1122334455667788;
+		dat_i <= 64'h7766554433221100;
+		we_i <= 1;
+		sel_i <= 2'b11;
+		xrs_rd_i <= 13;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		dword_i <= 0;
+		we_i <= 0;
+		sel_i <= 0;
+
+		assert_busy(1);
+		assert_wbmadr(64'h112233445566778E);
+		assert_wbmdat(16'h7766);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(`XRS_RWE_NO);
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmadr(64'h112233445566778C);
+		assert_wbmdat(16'h5544);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(`XRS_RWE_NO);
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmadr(64'h112233445566778A);
+		assert_wbmdat(16'h3322);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(`XRS_RWE_NO);
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmadr(64'h1122334455667788);
+		assert_wbmdat(16'h1100);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(`XRS_RWE_NO);
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmstb(0);
+		assert_wbmsel(2'b00);
+		assert_rwe(`XRS_RWE_NO);
+		
+		wbmack_i <= 1;
+		wbmdat_i <= 16'hDEAD;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		wbmdat_i <= 16'hBEEF;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		wbmdat_i <= 16'h0BAD;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		wbmdat_i <= 16'hC0DE;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_rwe(`XRS_RWE_S64);
+		assert_dat(64'hDEADBEEF0BADC0DE);
+		assert_rd(13);
+
+		wbmack_i <= 0;
+
+		// We must propegate destination register for
+		// non-memory operations as well.
+
+		story_to <= 12'h0C8;
+
+		addr_i <= 64'h1122334455667788;
+		dat_i <= 64'h7766554433221100;
+		we_i <= 0;
+		sel_i <= 0;
+		nomem_i <= 1;
+		xrs_rd_i <= 25;
+		wait(~clk_i); wait(clk_i); #1;
+		nomem_i <= 0;
+		assert_dat(64'h1122334455667788);
+		assert_rwe(`XRS_RWE_S64);
+		assert_rd(25);
 
 		#100;
 		$stop;
