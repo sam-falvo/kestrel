@@ -62,9 +62,6 @@
 //		2'b01	8-bit byte transfer.
 //		2'b00	Undefined behavior.
 //
-//		sel_i MUST remain valid throughout the complete Wishbone
-//		command phase.  This might change in the future.
-//
 // Outputs to Register Write-Back Stage:
 //
 // rwe_o	Pulsed for a single cycle when dat_o holds valid data.
@@ -117,6 +114,7 @@ module lsu(
 	reg	[63:0]	dat_o;
 	reg		rwe_o;
 	reg		we_r;
+	reg	[1:0]	sel_r;
 
 	// State machine for Wishbone B.4 bus.
 	// I truly hate having to use so many MUXes and other
@@ -128,9 +126,9 @@ module lsu(
 	reg		mt0, mt1, mt2, mt3;	// Master timeslots
 	reg		st0, st1, st2, st3;	// Slave timeslots
 
-	wire		send_low_byte = sel_i == 2'b01;
-	wire		send_high_byte = sel_i == 2'b10;
-	wire		send_hword = sel_i == 2'b11;
+	wire		send_low_byte = sel_r == 2'b01;
+	wire		send_high_byte = sel_r == 2'b10;
+	wire		send_hword = sel_r == 2'b11;
 
 	wire		next_mt0 = ~wbmstall_i ? (hword_i | mt1) : mt0;
 	wire		next_mt1 = ~wbmstall_i ? (word_i | mt2) : mt1;
@@ -158,7 +156,7 @@ module lsu(
 				 | (mt3 ? dat_i[63:48] : 0);
 	assign		wbmstb_o = mt0 | mt1 | mt2 | mt3;
 	assign		wbmwe_o = wbmstb_o ? we_r : 0;
-	assign		wbmsel_o = wbmstb_o ? sel_i : 0;
+	assign		wbmsel_o = wbmstb_o ? sel_r : 0;
 
 	assign		wbmcyc_o = st0 | st1 | st2 | st3;
 
@@ -166,6 +164,7 @@ module lsu(
 		dat_o <= dat_o;
 		rwe_o <= 0;
 		we_r <= we_r;
+		sel_r <= sel_r;
 
 		mt0 <= next_mt0;
 		mt1 <= next_mt1;
@@ -178,7 +177,7 @@ module lsu(
 		st3 <= next_st3;
 
 		if(reset_i) begin
-			dat_o <= 0;
+			{dat_o, sel_r} <= 0;
 			{mt0, mt1, mt2, mt3, st0, st1, st2, st3, we_r} <= 0;
 		end
 		else begin
@@ -189,21 +188,25 @@ module lsu(
 			if(hword_i || word_i || dword_i) begin
 				dat_o <= 0;
 				we_r <= we_i;
+				sel_r <= sel_i;
 			end
 			if(st0 & wbmack_i & send_low_byte) begin
 				dat_o[7:0] <= wbmdat_i[7:0];
 				rwe_o <= 1;
 				we_r <= 0;
+				sel_r <= 0;
 			end
 			if(st0 & wbmack_i & send_high_byte) begin
 				dat_o[7:0] <= wbmdat_i[15:8];
 				rwe_o <= 1;
 				we_r <= 0;
+				sel_r <= 0;
 			end
 			if(st0 & wbmack_i & send_hword) begin
 				dat_o[15:0] <= wbmdat_i;
 				rwe_o <= 1;
 				we_r <= 0;
+				sel_r <= 0;
 			end
 			if(st1 & wbmack_i) begin
 				dat_o[31:16] <= wbmdat_i;

@@ -95,6 +95,7 @@ module lsu_tb();
 		addr_i <= 64'h1122334455667788;
 		dat_i <= 64'h7766554433221100;
 		we_i <= 0;
+		sel_i <= 0;
 		nomem_i <= 1;
 		wait(~clk_i); wait(clk_i); #1;
 		assert_dat(64'h1122334455667788);
@@ -111,6 +112,7 @@ module lsu_tb();
 		assert_rwe(1);
 
 		we_i <= 0;
+		sel_i <= 0;
 
 		// When idle, the LSU must disable writebacks to the register
 		// file.
@@ -147,6 +149,7 @@ module lsu_tb();
 
 		hword_i <= 0;
 		we_i <= 0;
+		sel_i <= 0;
 
 		assert_busy(1);
 		assert_wbmadr(64'h1122334455667788);
@@ -185,11 +188,13 @@ module lsu_tb();
 		dat_i <= 64'h7766554433221100;
 		we_i <= 1;
 		wbmdat_i <= 16'hDEAD;
+		sel_i <= 2'b11;
 
 		wait(~clk_i); wait(clk_i); #1;
 
 		word_i <= 0;
 		we_i <= 0;
+		sel_i <= 0;
 
 		assert_busy(1);
 		assert_wbmadr(64'h112233445566778A);
@@ -241,11 +246,13 @@ module lsu_tb();
 		addr_i <= 64'h1122334455667788;
 		dat_i <= 64'h7766554433221100;
 		we_i <= 1;
+		sel_i <= 2'b11;
 
 		wait(~clk_i); wait(clk_i); #1;
 
 		dword_i <= 0;
 		we_i <= 0;
+		sel_i <= 0;
 
 		assert_busy(1);
 		assert_wbmadr(64'h112233445566778E);
@@ -345,6 +352,7 @@ module lsu_tb();
 
 		hword_i <= 0;
 		we_i <= 0;
+		sel_i <= 0;
 
 		assert_busy(1);
 		assert_wbmadr(64'h1122334455667788);
@@ -385,6 +393,7 @@ module lsu_tb();
 
 		hword_i <= 0;
 		we_i <= 0;
+		sel_i <= 0;
 
 		assert_busy(1);
 		assert_wbmadr(64'h1122334455667788);
@@ -428,6 +437,7 @@ module lsu_tb();
 
 		dword_i <= 0;
 		we_i <= 0;
+		sel_i <= 0;
 
 		assert_busy(1);
 		assert_wbmadr(64'h112233445566778E);
@@ -499,6 +509,7 @@ module lsu_tb();
 
 		dword_i <= 0;
 		we_i <= 0;
+		sel_i <= 0;
 
 		assert_busy(1);
 		assert_wbmadr(64'h112233445566778E);
