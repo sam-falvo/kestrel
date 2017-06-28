@@ -28,6 +28,10 @@
 //		Mutually exclusive with hword_i, word_i, and
 //		dword_i.
 //
+// unsigned_i	1 if the memory transfer requested via byte_i..
+//		dword_i is an unsigned transfer; 0 if signed.
+//		Ignored if no memory transfer is requested.
+//
 // byte_i
 // hword_i
 // word_i
@@ -97,6 +101,7 @@ module lsu(
 	input	[63:0]	addr_i,
 	input		we_i,
 	input		nomem_i,
+	input		unsigned_i,
 	input		byte_i,
 	input		hword_i,
 	input		word_i,
@@ -124,7 +129,7 @@ module lsu(
 	reg	[2:0]	rwe_o;
 	reg		we_r;
 	reg	[1:0]	sel_r;
-	reg		byte_r, hword_r, word_r, dword_r;
+	reg		byte_r, hword_r, word_r, dword_r, unsigned_r;
 	reg		rd_o;
 
 	// State machine for Wishbone B.4 bus.
@@ -182,6 +187,7 @@ module lsu(
 		hword_r <= hword_r;
 		word_r <= word_r;
 		dword_r <= dword_r;
+		unsigned_r <= unsigned_r;
 		rd_o <= rd_o;
 
 		mt0 <= next_mt0;
@@ -214,6 +220,7 @@ module lsu(
 				hword_r <= hword_i;
 				word_r <= word_i;
 				dword_r <= dword_i;
+				unsigned_r <= unsigned_i;
 				rd_o <= xrs_rd_i;
 			end
 
@@ -221,7 +228,7 @@ module lsu(
 				dat_o[7:0] <= wbmdat_i[7:0];
 				we_r <= 0;
 				sel_r <= 0;
-				{byte_r, hword_r, word_r, dword_r} <= 0;
+				{byte_r, hword_r, word_r, dword_r, unsigned_r} <= 0;
 			end
 			if(st0 & wbmack_i & send_high_byte) begin
 				dat_o[7:0] <= wbmdat_i[15:8];
@@ -233,7 +240,7 @@ module lsu(
 				dat_o[15:0] <= wbmdat_i;
 				we_r <= 0;
 				sel_r <= 0;
-				{byte_r, hword_r, word_r, dword_r} <= 0;
+				{byte_r, hword_r, word_r, dword_r, unsigned_r} <= 0;
 			end
 
 			if(st1 & wbmack_i) begin
@@ -247,13 +254,13 @@ module lsu(
 			end
 
 			if(st0 & wbmack_i & byte_r) begin
-				rwe_o <= `XRS_RWE_S8;
+				rwe_o <= (unsigned_r ? `XRS_RWE_U8 : `XRS_RWE_S8);
 			end
 			if(st0 & wbmack_i & hword_r) begin
-				rwe_o <= `XRS_RWE_S16;
+				rwe_o <= (unsigned_r ? `XRS_RWE_U16 : `XRS_RWE_S16);
 			end
 			if(st0 & wbmack_i & word_r) begin
-				rwe_o <= `XRS_RWE_S32;
+				rwe_o <= (unsigned_r ? `XRS_RWE_U32 : `XRS_RWE_S32);
 			end
 			if(st0 & wbmack_i & dword_r) begin
 				rwe_o <= `XRS_RWE_S64;

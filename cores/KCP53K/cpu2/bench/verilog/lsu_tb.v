@@ -8,7 +8,7 @@ module lsu_tb();
 	reg	[11:0]	story_to;
 	reg		fault_to;
 	reg		clk_i, reset_i, we_i, nomem_i;
-	reg		byte_i, hword_i, word_i, dword_i;
+	reg		byte_i, hword_i, word_i, dword_i, unsigned_i;
 	reg	[63:0]	addr_i, dat_i;
 	reg	[1:0]	sel_i;
 	reg	[4:0]	xrs_rd_i;
@@ -31,6 +31,7 @@ module lsu_tb();
 		.addr_i(addr_i),
 		.we_i(we_i),
 		.nomem_i(nomem_i),
+		.unsigned_i(unsigned_i),
 		.byte_i(byte_i),
 		.hword_i(hword_i),
 		.word_i(word_i),
@@ -84,7 +85,7 @@ module lsu_tb();
 		{
 		  wbmack_i, addr_i, dat_i, we_i, nomem_i, hword_i, word_i,
 		  dword_i, clk_i, reset_i, story_to, fault_to, sel_i,
-		  wbmstall_i, byte_i, xrs_rd_i
+		  wbmstall_i, byte_i, xrs_rd_i, unsigned_i
 		} <= 0;
 
 		wait(~clk_i); wait(clk_i); #1;
@@ -721,6 +722,51 @@ module lsu_tb();
 		assert_dat(64'h1122334455667788);
 		assert_rwe(`XRS_RWE_S64);
 		assert_rd(25);
+
+		// Testing unsigned_i effectiveness.  If asserted,
+		// any signed operation must be converted to an
+		// unsigned operation.
+
+		story_to <= 12'h0D0;
+
+		unsigned_i <= 1;
+		hword_i <= 1;
+		addr_i <= 64'h1122334455667788;
+		dat_i <= 64'h7766554433221100;
+		we_i <= 1;
+		wbmdat_i <= 16'hDEAD;
+		sel_i <= 2'b11;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		unsigned_i <= 0;
+		hword_i <= 0;
+		we_i <= 0;
+		sel_i <= 0;
+
+		assert_busy(1);
+		assert_wbmadr(64'h1122334455667788);
+		assert_wbmdat(16'h1100);
+		assert_wbmwe(1);
+		assert_wbmstb(1);
+		assert_wbmsel(2'b11);
+		assert_rwe(`XRS_RWE_NO);
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_busy(1);
+		assert_wbmstb(0);
+		assert_wbmsel(2'b00);
+		assert_rwe(`XRS_RWE_NO);
+		
+		wbmack_i <= 1;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_rwe(`XRS_RWE_U16);
+		assert_dat(64'h000000000000DEAD);
+
+		wbmack_i <= 0;
 
 		#100;
 		$stop;
