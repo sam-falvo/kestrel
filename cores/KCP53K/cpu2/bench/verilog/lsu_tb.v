@@ -7,8 +7,8 @@
 module lsu_tb();
 	reg	[11:0]	story_to;
 	reg		fault_to;
-	reg		clk_i, reset_i, we_i, nomem_i;
-	reg		byte_i, hword_i, word_i, dword_i, unsigned_i;
+	reg		clk_i, reset_i, we_i, nomem_i, mem_i;
+	reg	[2:0]	xrs_rwe_i;
 	reg	[63:0]	addr_i, dat_i;
 	reg	[1:0]	sel_i;
 	reg	[4:0]	xrs_rd_i;
@@ -31,11 +31,8 @@ module lsu_tb();
 		.addr_i(addr_i),
 		.we_i(we_i),
 		.nomem_i(nomem_i),
-		.unsigned_i(unsigned_i),
-		.byte_i(byte_i),
-		.hword_i(hword_i),
-		.word_i(word_i),
-		.dword_i(dword_i),
+		.mem_i(mem_i),
+		.xrs_rwe_i(xrs_rwe_i),
 		.busy_o(busy_o),
 		.rwe_o(rwe_o),
 		.dat_o(dat_o),
@@ -83,9 +80,9 @@ module lsu_tb();
 		$dumpvars;
 
 		{
-		  wbmack_i, addr_i, dat_i, we_i, nomem_i, hword_i, word_i,
-		  dword_i, clk_i, reset_i, story_to, fault_to, sel_i,
-		  wbmstall_i, byte_i, xrs_rd_i, unsigned_i
+		  wbmack_i, addr_i, dat_i, we_i, nomem_i, mem_i,
+		  clk_i, reset_i, story_to, fault_to, sel_i,
+		  wbmstall_i, xrs_rd_i, xrs_rwe_i
 		} <= 0;
 
 		wait(~clk_i); wait(clk_i); #1;
@@ -108,9 +105,24 @@ module lsu_tb();
 		we_i <= 0;
 		sel_i <= 0;
 		nomem_i <= 1;
+		xrs_rwe_i <= `XRS_RWE_S64;
 		wait(~clk_i); wait(clk_i); #1;
 		assert_dat(64'h1122334455667788);
 		assert_rwe(`XRS_RWE_S64);
+
+		story_to <= 12'h014;
+
+		addr_i <= 64'h1122334455667788;
+		dat_i <= 64'h7766554433221100;
+		we_i <= 0;
+		sel_i <= 0;
+		nomem_i <= 1;
+		xrs_rwe_i <= `XRS_RWE_S32;
+		wait(~clk_i); wait(clk_i); #1;
+		assert_dat(64'h1122334455667788);
+		assert_rwe(`XRS_RWE_S32);
+
+		// we_i is ignored during non-memory cycles.
 
 		story_to <= 12'h018;
 
@@ -118,6 +130,7 @@ module lsu_tb();
 		dat_i <= 64'h7766554433221100;
 		we_i <= 1;
 		nomem_i <= 1;
+		xrs_rwe_i <= `XRS_RWE_S64;
 		wait(~clk_i); wait(clk_i); #1;
 		assert_dat(64'h1122334455667788);
 		assert_rwe(`XRS_RWE_S64);
@@ -131,6 +144,7 @@ module lsu_tb();
 		story_to <= 12'h020;
 
 		nomem_i <= 0;
+		xrs_rwe_i <= `XRS_RWE_U32;
 		wait(~clk_i); wait(clk_i); #1;
 		assert_rwe(`XRS_RWE_NO);
 
@@ -149,7 +163,8 @@ module lsu_tb();
 
 		story_to <= 12'h040;
 
-		hword_i <= 1;
+		mem_i <= 1;
+		xrs_rwe_i <= `XRS_RWE_S16;
 		addr_i <= 64'h1122334455667788;
 		dat_i <= 64'h7766554433221100;
 		we_i <= 1;
@@ -158,7 +173,8 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		hword_i <= 0;
+		xrs_rwe_i <= `XRS_RWE_NO;
+		mem_i <= 0;
 		we_i <= 0;
 		sel_i <= 0;
 
@@ -194,7 +210,8 @@ module lsu_tb();
 
 		story_to <= 12'h050;
 
-		word_i <= 1;
+		mem_i <= 1;
+		xrs_rwe_i <= `XRS_RWE_S32;
 		addr_i <= 64'h1122334455667788;
 		dat_i <= 64'h7766554433221100;
 		we_i <= 1;
@@ -203,7 +220,8 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		word_i <= 0;
+		mem_i <= 0;
+		xrs_rwe_i <= `XRS_RWE_NO;
 		we_i <= 0;
 		sel_i <= 0;
 
@@ -253,7 +271,8 @@ module lsu_tb();
 
 		story_to <= 12'h060;
 
-		dword_i <= 1;
+		mem_i <= 1;
+		xrs_rwe_i <= `XRS_RWE_S64;
 		addr_i <= 64'h1122334455667788;
 		dat_i <= 64'h7766554433221100;
 		we_i <= 1;
@@ -261,7 +280,8 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		dword_i <= 0;
+		mem_i <= 0;
+		xrs_rwe_i <= `XRS_RWE_NO;
 		we_i <= 0;
 		sel_i <= 0;
 
@@ -352,7 +372,8 @@ module lsu_tb();
 
 		story_to <= 12'h080;
 
-		byte_i <= 1;
+		mem_i <= 1;
+		xrs_rwe_i <= `XRS_RWE_S8;
 		sel_i <= 2'b01;
 		addr_i <= 64'h1122334455667788;
 		dat_i <= 64'h77665544332211A5;
@@ -361,7 +382,8 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		byte_i <= 0;
+		mem_i <= 0;
+		xrs_rwe_i <= `XRS_RWE_NO;
 		we_i <= 0;
 		sel_i <= 0;
 
@@ -393,7 +415,8 @@ module lsu_tb();
 
 		story_to <= 12'h088;
 
-		byte_i <= 1;
+		mem_i <= 1;
+		xrs_rwe_i <= `XRS_RWE_S8;
 		sel_i <= 2'b10;
 		addr_i <= 64'h1122334455667788;
 		dat_i <= 64'h77665544332211A5;
@@ -402,7 +425,8 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		byte_i <= 0;
+		mem_i <= 0;
+		xrs_rwe_i <= `XRS_RWE_NO;
 		we_i <= 0;
 		sel_i <= 0;
 
@@ -438,7 +462,8 @@ module lsu_tb();
 
 		story_to <= 12'h0A0;
 
-		dword_i <= 1;
+		mem_i <= 1;
+		xrs_rwe_i <= `XRS_RWE_S64;
 		addr_i <= 64'h1122334455667788;
 		dat_i <= 64'h7766554433221100;
 		we_i <= 1;
@@ -446,7 +471,8 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		dword_i <= 0;
+		mem_i <= 0;
+		xrs_rwe_i <= `XRS_RWE_NO;
 		we_i <= 0;
 		sel_i <= 0;
 
@@ -510,7 +536,8 @@ module lsu_tb();
 
 		story_to <= 12'h0B0;
 
-		dword_i <= 1;
+		mem_i <= 1;
+		xrs_rwe_i <= `XRS_RWE_S64;
 		addr_i <= 64'h1122334455667788;
 		dat_i <= 64'h7766554433221100;
 		we_i <= 1;
@@ -518,7 +545,8 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		dword_i <= 0;
+		mem_i <= 0;
+		xrs_rwe_i <= `XRS_RWE_NO;
 		we_i <= 0;
 		sel_i <= 0;
 
@@ -625,7 +653,8 @@ module lsu_tb();
 
 		story_to <= 12'h0C0;
 
-		dword_i <= 1;
+		mem_i <= 1;
+		xrs_rwe_i <= `XRS_RWE_S64;
 		addr_i <= 64'h1122334455667788;
 		dat_i <= 64'h7766554433221100;
 		we_i <= 1;
@@ -634,7 +663,8 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		dword_i <= 0;
+		mem_i <= 0;
+		xrs_rwe_i <= `XRS_RWE_NO;
 		we_i <= 0;
 		sel_i <= 0;
 
@@ -717,6 +747,7 @@ module lsu_tb();
 		sel_i <= 0;
 		nomem_i <= 1;
 		xrs_rd_i <= 25;
+		xrs_rwe_i <= `XRS_RWE_S64;
 		wait(~clk_i); wait(clk_i); #1;
 		nomem_i <= 0;
 		assert_dat(64'h1122334455667788);
@@ -729,8 +760,8 @@ module lsu_tb();
 
 		story_to <= 12'h0D0;
 
-		unsigned_i <= 1;
-		hword_i <= 1;
+		mem_i <= 1;
+		xrs_rwe_i <= `XRS_RWE_U16;
 		addr_i <= 64'h1122334455667788;
 		dat_i <= 64'h7766554433221100;
 		we_i <= 1;
@@ -739,8 +770,8 @@ module lsu_tb();
 
 		wait(~clk_i); wait(clk_i); #1;
 
-		unsigned_i <= 0;
-		hword_i <= 0;
+		mem_i <= 0;
+		xrs_rwe_i <= `XRS_RWE_NO;
 		we_i <= 0;
 		sel_i <= 0;
 
