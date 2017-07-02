@@ -21,26 +21,27 @@
 //
 // we_i		1 for write transaction; 0 for read.  Ignored
 //		if no memory operation is requested; see
-//		hword_i, word_i, and dword_i below.
+//		mem_i below.
 //
 // nomem_i	1 if the value presented to addr_i is intended
 //		to be written back to the register file.
-//		Mutually exclusive with hword_i, word_i, and
-//		dword_i.
+//		Mutually exclusive with mem_i.  The xrs_rwe_i
+//		signal determines transfer size and zero/sign-
+//		extension.
 //
 // mem_i	1 if the value presented to addr_i is a proper
 //		memory address, and a memory transaction is to
 //		occur.  The xrs_rwe_i signal determines transfer
-//		size.
+//		size and zero/sign-extension.
 //
 //		At least one of nomem_i or mem_i should be asserted every idle
 //		clock cycle.  If none are asserted, the register write-back
 //		stage of the pipeline will receive a bubble in the next cycle.
 //
 // xrs_rwe_i	One of the following values, indicating both the
-//		size of, and the signedness of, a memory transfer.
+//		size of, and the signedness of, the register writeback.
 //
-//		XRS_RWE_NO	undefined behavior.
+//		XRS_RWE_NO	No register writeback. [1]
 //		XRS_RWE_S8	Signed, 8-bit transfer.
 //		XRS_RWE_S16	Signed, 16-bit transfer.
 //		XRS_RWE_S32	Signed, 32-bit transfer.
@@ -49,9 +50,11 @@
 //		XRS_RWE_U16	Unsigned, 16-bit transfer.
 //		XRS_RWE_U32	Unsigned, 32-bit transfer.
 //
-// dat_i	If one of byte_i, hword_i, word_i, or dword_i signals the
-//		start of a Wishbone transaction, this signal contains
-//		the value to be written out over wbmdat_o.
+//		Note 1: XRS_RWE_NO will cause additional undefined behavior
+//		when used with a memory access cycle.
+//
+// dat_i	If mem_i signals the start of a Wishbone transaction, this
+//		signal contains the value to be written out over wbmdat_o.
 //		Ignored otherwise.
 //
 // sel_i	Byte lane select signals.  sel_i[1] selects the upper-half
@@ -103,13 +106,14 @@ module lsu(
 	input		nomem_i,
 	input		mem_i,
 	input	[2:0]	xrs_rwe_i,
-	output		busy_o,
-	output	[2:0]	rwe_o,
-	output	[63:0]	dat_o,
 	input	[63:0]	dat_i,
 	input	[1:0]	sel_i,
-
 	input	[4:0]	xrs_rd_i,
+
+	output		busy_o,
+
+	output	[2:0]	rwe_o,
+	output	[63:0]	dat_o,
 	output	[4:0]	rd_o,
 
 	output	[63:0]	wbmadr_o,
@@ -135,6 +139,20 @@ module lsu(
 	// the number of clock cycles consumed under control.
 	// This will slow the maximum speed of the pipeline,
 	// however.
+	//
+	// mt3..mt0 determines which cycle of the transfer the
+	// master is participating on; st3..st0 serve the same
+	// role for the slave.
+	//
+	// At the start of a cycle, mtX and stX are both set
+	// (0 <= X <= 3, depending upon the size of the transfer).
+	// Note that bytes are treated as special cases of half-
+	// words.
+	//
+	// send_XXX are convenience signals indicating which
+	// byte lanes are valid on the Wishbone bus.  These are used
+	// to disambiguate byte transfers from real half-word trans-
+	// fers, as well as to perform byte-steering logic.
 
 	reg		mt0, mt1, mt2, mt3;	// Master timeslots
 	reg		st0, st1, st2, st3;	// Slave timeslots
@@ -143,8 +161,6 @@ module lsu(
 	wire		send_high_byte = sel_r == 2'b10;
 	wire		send_hword = sel_r == 2'b11;
 
-	// Note that we take inputs from byte_i..dword_i, NOT
-	// byte_r..dword_r.  This reduces our cycle time by one cycle.
 	wire		byte = (xrs_rwe_i == `XRS_RWE_S8) || (xrs_rwe_i == `XRS_RWE_U8);
 	wire		hword = (xrs_rwe_i == `XRS_RWE_S16) || (xrs_rwe_i == `XRS_RWE_U16);
 	wire		word = (xrs_rwe_i == `XRS_RWE_S32) || (xrs_rwe_i == `XRS_RWE_U32);
