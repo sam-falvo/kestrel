@@ -166,15 +166,15 @@ module lsu(
 	wire		word = (xrs_rwe_i == `XRS_RWE_S32) || (xrs_rwe_i == `XRS_RWE_U32);
 	wire		dword = (xrs_rwe_i == `XRS_RWE_S64);
 
-	wire		next_mt0 = hword | byte | (~wbmstall_i ? mt1 : mt0);
-	wire		next_mt1 = word | (~wbmstall_i ? mt2 : mt1);
-	wire		next_mt2 = ~wbmstall_i ? mt3 : mt2;
-	wire		next_mt3 = dword | (~wbmstall_i ? 0 : mt3);
+	wire		next_mt0 = mem_i ? (hword | byte) : (~wbmstall_i ? mt1 : mt0);
+	wire		next_mt1 = mem_i ? word : (~wbmstall_i ? mt2 : mt1);
+	wire		next_mt2 = mem_i ? 0 : (~wbmstall_i ? mt3 : mt2);
+	wire		next_mt3 = mem_i ? dword : (~wbmstall_i ? 0 : mt3);
 
-	wire		next_st0 = hword | byte | (st0 & ~wbmack_i) | (st1 & wbmack_i);
-	wire		next_st1 = word | (st1 & ~wbmack_i) | (st2 & wbmack_i);
-	wire		next_st2 = (st2 & ~wbmack_i) | (st3 & wbmack_i);
-	wire		next_st3 = dword | (st3 & ~wbmack_i);
+	wire		next_st0 = mem_i ? (hword | byte) : (st0 & ~wbmack_i) | (st1 & wbmack_i);
+	wire		next_st1 = mem_i ? word : (st1 & ~wbmack_i) | (st2 & wbmack_i);
+	wire		next_st2 = mem_i ? 0 : (st2 & ~wbmack_i) | (st3 & wbmack_i);
+	wire		next_st3 = mem_i ? dword : (st3 & ~wbmack_i);
 
 	wire	[15:0]	byte_data = {dat_i[7:0], dat_i[7:0]};
 
