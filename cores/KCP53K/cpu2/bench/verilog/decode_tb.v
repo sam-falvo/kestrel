@@ -182,7 +182,126 @@ module decode_tb();
 		assert_xrs_rwe(`XRS_RWE_S64);
 		assert_illegal(0);
 
+		// SB X1, 1(X2)		0000000_00001_00010_000_00001_0100011
+		// SH X2, 2(X3)		0000000_00010_00011_001_00010_0100011
+		// SW X3, 3(X4)		0000000_00011_00100_010_00011_0100011
+		// SD X4, 4(X5)		0000000_00100_00101_011_00100_0100011 
+
+		story_to <= 12'h020;
+		inst_en_i <= 1;
+		inst_i <= 32'b0000000_00001_00010_000_00001_0100011;
 		wait(~clk_i); wait(clk_i); #1;
+
+		#10 rs1val_i <= 64'd1;
+		rs2val_i <= 64'hDEAD_BEEF_FEED_FACE;
+		#1;
+		assert_inpa(64'd1);
+		assert_inpb(1);
+		assert_invB(0);
+		assert_cflag(0);
+		assert_lsh_en(0);
+		assert_rsh_en(0);
+		assert_ltu_en(0);
+		assert_lts_en(0);
+		assert_sum_en(1);
+		assert_and_en(0);
+		assert_xor_en(0);
+//		assert_rd(1);
+		assert_rs1(2);
+		assert_rs2(1);
+		assert_we(1);
+		assert_nomem(0);
+		assert_mem(1);
+		assert_dat(64'hDEAD_BEEF_FEED_FACE);
+		assert_xrs_rwe(`XRS_RWE_S8);
+		assert_illegal(0);
+
+		story_to <= 12'h024;
+		inst_i <= 32'b0000000_00010_00011_001_00010_0100011;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		#10 rs1val_i <= 64'd2;
+		rs2val_i <= 64'hDEAD_BEEF_FEED_FACE;
+		#1;
+		assert_inpa(64'd2);
+		assert_inpb(2);
+		assert_invB(0);
+		assert_cflag(0);
+		assert_lsh_en(0);
+		assert_rsh_en(0);
+		assert_ltu_en(0);
+		assert_lts_en(0);
+		assert_sum_en(1);
+		assert_and_en(0);
+		assert_xor_en(0);
+//		assert_rd(1);
+		assert_rs1(3);
+		assert_rs2(2);
+		assert_we(1);
+		assert_nomem(0);
+		assert_mem(1);
+		assert_dat(64'hDEAD_BEEF_FEED_FACE);
+		assert_xrs_rwe(`XRS_RWE_S16);
+		assert_illegal(0);
+
+		story_to <= 12'h028;
+		inst_i <= 32'b0000000_00011_00100_010_00011_0100011;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		#10 rs1val_i <= 64'd1;
+		rs2val_i <= 64'hDEAD_BEEF_FEED_FACE;
+		#1;
+		assert_inpa(64'd1);
+		assert_inpb(3);
+		assert_invB(0);
+		assert_cflag(0);
+		assert_lsh_en(0);
+		assert_rsh_en(0);
+		assert_ltu_en(0);
+		assert_lts_en(0);
+		assert_sum_en(1);
+		assert_and_en(0);
+		assert_xor_en(0);
+//		assert_rd(1);
+		assert_rs1(4);
+		assert_rs2(3);
+		assert_we(1);
+		assert_nomem(0);
+		assert_mem(1);
+		assert_dat(64'hDEAD_BEEF_FEED_FACE);
+		assert_xrs_rwe(`XRS_RWE_S32);
+		assert_illegal(0);
+
+		story_to <= 12'h02C;
+		inst_i <= 32'b0000000_00100_00101_011_00100_0100011;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		#10 rs1val_i <= 64'd4;
+		rs2val_i <= 64'hDEAD_BEEF_FEED_FACE;
+		#1;
+		assert_inpa(64'd4);
+		assert_inpb(4);
+		assert_invB(0);
+		assert_cflag(0);
+		assert_lsh_en(0);
+		assert_rsh_en(0);
+		assert_ltu_en(0);
+		assert_lts_en(0);
+		assert_sum_en(1);
+		assert_and_en(0);
+		assert_xor_en(0);
+//		assert_rd(1);
+		assert_rs1(5);
+		assert_rs2(4);
+		assert_we(1);
+		assert_nomem(0);
+		assert_mem(1);
+		assert_dat(64'hDEAD_BEEF_FEED_FACE);
+		assert_xrs_rwe(`XRS_RWE_S64);
+		assert_illegal(0);
 
 		#100;
 		$display("@Done.");

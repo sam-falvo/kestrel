@@ -108,6 +108,7 @@ module decode(
 	assign	rd_o = inst_r[11:7];
 
 	wire	[63:0]	imm12 = {{52{inst_r[31]}}, inst_r[31:20]};
+	wire	[63:0]	imm12s = {{52{inst_r[31]}}, inst_r[31:25], inst_r[11:7]};
 
 	always @(*) begin
 		illegal_o <= 1;
@@ -130,6 +131,26 @@ module decode(
 		xrs_rwe_o <= `XRS_RWE_S64;
 
 		if (inst_r[1:0] == 2'b11) begin
+			// STORE
+			if((inst_r[6:5] == 2'b01) &&
+			   (inst_r[4:2] == 3'b000) &&
+			   (inst_r[14] == 0)) begin
+				illegal_o <= 0;
+				inpa_o <= rs1val_i;
+				inpb_o <= imm12s;
+				sum_en_o <= 1;
+				nomem_o <= 0;
+				mem_o <= 1;
+				we_o <= 1;
+				dat_o <= rs2val_i;
+				case (inst_r[13:12])
+				2'b00: xrs_rwe_o <= `XRS_RWE_S8;
+				2'b01: xrs_rwe_o <= `XRS_RWE_S16;
+				2'b10: xrs_rwe_o <= `XRS_RWE_S32;
+				2'b11: xrs_rwe_o <= `XRS_RWE_S64;
+				endcase
+			end
+
 			// OP-IMM
 			if((inst_r[6:5] == 2'b00) &&
 			   (inst_r[4:2] == 3'b100)) begin
