@@ -99,6 +99,7 @@ module decode_tb();
 		reset_i <= 1;
 		wait(~clk_i); wait(clk_i); #1;
 		reset_i <= 0;
+
 		assert_inpa(0);
 		assert_inpb(0);
 		assert_invB(0);
@@ -112,13 +113,76 @@ module decode_tb();
 		assert_xor_en(0);
 		assert_rd(0);
 		assert_rs1(0);
-		assert_rs2(0);
+//		assert_rs2(0);
 		assert_we(0);
 		assert_nomem(1);
 		assert_mem(0);
 		assert_dat(0);
 		assert_xrs_rwe(`XRS_RWE_S64);
 		assert_illegal(0);
+
+		// ADDI X1, X0, $800
+		// SLLI X1, X1, 52
+
+		story_to <= 12'h010;
+		inst_en_i <= 1;
+		inst_i <= 32'b100000000000_00000_000_00001_0010011;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_inpa(0);
+		assert_inpb(64'hFFFF_FFFF_FFFF_F800);
+		assert_invB(0);
+		assert_cflag(0);
+		assert_lsh_en(0);
+		assert_rsh_en(0);
+		assert_ltu_en(0);
+		assert_lts_en(0);
+		assert_sum_en(1);
+		assert_and_en(0);
+		assert_xor_en(0);
+		assert_rd(1);
+		assert_rs1(0);
+//		assert_rs2(0);
+		assert_we(0);
+		assert_nomem(1);
+		assert_mem(0);
+		assert_dat(0);
+		assert_xrs_rwe(`XRS_RWE_S64);
+		assert_illegal(0);
+
+		story_to <= 12'h018;
+		inst_i <= 32'b000000110100_00001_001_00001_0010011;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		#10 rs1val_i <= 64'hFFFF_FFFF_FFFF_F800;
+		rs2val_i <= 64'hDEAD_BEEF_FEED_FACE;
+
+		#1;
+
+		assert_inpa(64'hFFFF_FFFF_FFFF_F800);
+		assert_inpb(52);
+		assert_invB(0);
+		assert_cflag(0);
+		assert_lsh_en(1);
+		assert_rsh_en(0);
+		assert_ltu_en(0);
+		assert_lts_en(0);
+		assert_sum_en(0);
+		assert_and_en(0);
+		assert_xor_en(0);
+		assert_rd(1);
+		assert_rs1(1);
+//		assert_rs2(0);
+		assert_we(0);
+		assert_nomem(1);
+		assert_mem(0);
+		assert_dat(0);
+		assert_xrs_rwe(`XRS_RWE_S64);
+		assert_illegal(0);
+
+		wait(~clk_i); wait(clk_i); #1;
 
 		#100;
 		$display("@Done.");
