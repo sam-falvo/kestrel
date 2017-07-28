@@ -4,6 +4,8 @@ help:
 	@echo "make exec.waves        Run execute stage testbench and plot waveforms"
 	@echo "make decode.waves      Run decode stage testbench and plot waveforms"
 	@echo
+	@echo "make integration       Run the integration test and plot waveforms"
+	@echo
 	@echo "make clean             remove output files"
 	@echo
 
@@ -18,6 +20,9 @@ exec.waves:
 
 decode.waves:
 	iverilog -s decode_tb ../../common/*.v bench/verilog/*.v rtl/verilog/*.v -Iinclude/verilog -I../../common && vvp -n a.out && gtkwave decode.vcd
+
+integration:
+	iverilog -s integration_tb ../../common/*.v bench/verilog/*.v rtl/verilog/*.v -Iinclude/verilog -I../../common && vvp -n a.out && gtkwave integration.vcd
 
 clean:
 	rm -f *.blif *.asc *.bin *.vcd a.out
