@@ -57,21 +57,6 @@
 //		signal contains the value to be written out over wbmdat_o.
 //		Ignored otherwise.
 //
-// sel_i	Byte lane select signals.  sel_i[1] selects the upper-half
-//		of the data bus, while sel_i[0] selects the lower-half.
-//		Ignored if no memory operation is requested.
-//		Otherwise, passed through to wbmsel_o during bus command
-//		phases.
-//
-//		For half-word and larger transfers, sel_i MUST be 2'b11.  For
-//		byte transfers, it may take on one of two valid values:
-//
-//		2'b10	8-bit byte transfer over wbmdat_o[15:8]
-//		2'b01	8-bit byte transfer over wbmdat_o[7:0]
-//
-//		Note that for byte transfers, data is taken from dat_i[7:0]
-//		regardless of which byte lane is enabled.
-//
 // Outputs to Register Write-Back Stage:
 //
 // rwe_o	Pulsed for a single cycle when dat_o holds valid data.
@@ -107,7 +92,6 @@ module lsu(
 	input		mem_i,
 	input	[2:0]	xrs_rwe_i,
 	input	[63:0]	dat_i,
-	input	[1:0]	sel_i,
 	input	[4:0]	xrs_rd_i,
 
 	output		busy_o,
@@ -165,6 +149,8 @@ module lsu(
 	wire		hword = (xrs_rwe_i == `XRS_RWE_S16) || (xrs_rwe_i == `XRS_RWE_U16);
 	wire		word = (xrs_rwe_i == `XRS_RWE_S32) || (xrs_rwe_i == `XRS_RWE_U32);
 	wire		dword = (xrs_rwe_i == `XRS_RWE_S64);
+
+	wire	[1:0]	sel_i = byte ? {addr_i[0], ~addr_i[0]} : {2{hword | word | dword}};
 
 	wire		next_mt0 = mem_i ? (hword | byte) : (~wbmstall_i ? mt1 : mt0);
 	wire		next_mt1 = mem_i ? word : (~wbmstall_i ? mt2 : mt1);
