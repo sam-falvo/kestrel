@@ -18,7 +18,7 @@ module integration_tb();
 	wire		dec_ex_invB, dec_ex_cflag, dec_ex_lsh_en, dec_ex_rsh_en;
 	wire		dec_ex_ltu_en, dec_ex_lts_en, dec_ex_sum_en, dec_ex_and_en;
 	wire		dec_ex_xor_en, dec_ex_we, dec_ex_nomem, dec_ex_mem;
-	wire	[4:0]	dec_ex_rd, dec_ex_rs1, dec_ex_rs2;
+	wire	[4:0]	dec_ex_rd, dec_xrs_rs1, dec_xrs_rs2;
 	wire	[63:0]	dec_ex_dat;
 	wire	[2:0]	dec_ex_xrs_rwe;
 
@@ -66,8 +66,8 @@ module integration_tb();
 		.and_en_o(dec_ex_and_en),
 		.xor_en_o(dec_ex_xor_en),
 		.rd_o(dec_ex_rd),
-		.rs1_o(dec_ex_rs1),
-		.rs2_o(dec_ex_rs2),
+		.rs1_o(dec_xrs_rs1),
+		.rs2_o(dec_xrs_rs2),
 		.we_o(dec_ex_we),
 		.nomem_o(dec_ex_nomem),
 		.mem_o(dec_ex_mem),
@@ -145,8 +145,8 @@ module integration_tb();
 
 		.rdata_o(xrs_dec_rs1val),
 		.rdatb_o(xrs_dec_rs2val),
-		.ra_i(dec_ex_rs1),
-		.rb_i(dec_ex_rs2)
+		.ra_i(dec_xrs_rs1),
+		.rb_i(dec_xrs_rs2)
 	);
 
 	task zero;
@@ -172,6 +172,32 @@ module integration_tb();
 		reset_i <= 1;
 		wait(~clk_i); wait(clk_i); #1;
 		reset_i <= 0;
+
+		inst_en_i <= 1;
+		inst_i <= 32'b000100000000_00000_000_00001_0010011; // ADDI X1, X0, 256
+		wait(~clk_i); wait(clk_i); #1;
+		inst_i <= 32'b000000000000_00000_000_00000_0010011;
+		wait(~clk_i); wait(clk_i); #1;
+		wait(~clk_i); wait(clk_i); #1;
+		wait(~clk_i); wait(clk_i); #1;
+		wait(~clk_i); wait(clk_i); #1;
+
+		inst_i <= 32'b000100000000_00001_000_00001_0010011; // ADDI X1, X1, 256
+		wait(~clk_i); wait(clk_i); #1;
+		inst_i <= 32'b000000000000_00000_000_00000_0010011;
+		wait(~clk_i); wait(clk_i); #1;
+		wait(~clk_i); wait(clk_i); #1;
+		wait(~clk_i); wait(clk_i); #1;
+		wait(~clk_i); wait(clk_i); #1;
+
+		inst_i <= 32'b0000000_00001_00000_011_00000_0100011; // SD X1, 0(X0)
+		wait(~clk_i); wait(clk_i); #1;
+		inst_i <= 32'b000000000000_00000_000_00000_0010011;
+		wait(~clk_i); wait(clk_i); #1;
+		wait(~clk_i); wait(clk_i); #1;
+		wait(~clk_i); wait(clk_i); #1;
+		wait(~clk_i); wait(clk_i); #1;
+
 
 		#100;
 		$display("@Done.");

@@ -103,8 +103,14 @@ module decode(
 	reg		mem_o;
 	reg	[2:0]	xrs_rwe_o;
 
-	assign	rs2_o = inst_r[24:20];
-	assign	rs1_o = inst_r[19:15];
+	// We make rs{1,2}_o depend on the instruction _inputs_
+	// (instead of the registered instruction) because it saves
+	// us a pipeline stage on iCE40-class FPGAs.  For FPGAs with
+	// asynchronously read block RAMs, you can switch these to
+	// forward inst_r bits instead without loss of functionality.
+	assign	rs2_o = inst_i[24:20];
+	assign	rs1_o = inst_i[19:15];
+
 	assign	rd_o = inst_r[11:7];
 
 	wire	[63:0]	imm12 = {{52{inst_r[31]}}, inst_r[31:20]};

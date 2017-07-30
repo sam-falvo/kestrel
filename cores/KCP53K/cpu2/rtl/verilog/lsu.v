@@ -116,6 +116,7 @@ module lsu(
 	reg	[1:0]	sel_r;
 	reg		byte_r, hword_r, word_r, dword_r, unsigned_r;
 	reg		rd_o;
+	reg	[63:0]	dat_r;
 
 	// State machine for Wishbone B.4 bus.
 	// I truly hate having to use so many MUXes and other
@@ -162,7 +163,7 @@ module lsu(
 	wire		next_st2 = mem_i ? 0 : (st2 & ~wbmack_i) | (st3 & wbmack_i);
 	wire		next_st3 = mem_i ? dword : (st3 & ~wbmack_i);
 
-	wire	[15:0]	byte_data = {dat_i[7:0], dat_i[7:0]};
+	wire	[15:0]	byte_data = {dat_r[7:0], dat_r[7:0]};
 
 	assign		wbmadr_o = ((mt0 & send_low_byte) ? addr_i : 0)
 				 | ((mt0 & send_high_byte) ? addr_i : 0)
@@ -172,10 +173,10 @@ module lsu(
 				 | (mt3 ? {addr_i[63:3], 3'b110} : 0);
 	assign		wbmdat_o = ((mt0 & send_low_byte) ? byte_data : 0)
 				 | ((mt0 & send_high_byte) ? byte_data : 0)
-				 | ((mt0 & send_hword) ? dat_i[15:0] : 0)
-				 | (mt1 ? dat_i[31:16] : 0)
-				 | (mt2 ? dat_i[47:32] : 0)
-				 | (mt3 ? dat_i[63:48] : 0);
+				 | ((mt0 & send_hword) ? dat_r[15:0] : 0)
+				 | (mt1 ? dat_r[31:16] : 0)
+				 | (mt2 ? dat_r[47:32] : 0)
+				 | (mt3 ? dat_r[63:48] : 0);
 	assign		wbmstb_o = mt0 | mt1 | mt2 | mt3;
 	assign		wbmwe_o = wbmstb_o ? we_r : 0;
 	assign		wbmsel_o = wbmstb_o ? sel_r : 0;
@@ -214,6 +215,7 @@ module lsu(
 
 			if(mem_i) begin
 				dat_o <= 0;
+				dat_r <= dat_i;
 				we_r <= we_i;
 				sel_r <= sel_i;
 				xrs_rwe_r <= xrs_rwe_i;
