@@ -3,6 +3,7 @@ help:
 	@echo "make lsu.waves         Run load/store unit testbench and plot waveforms"
 	@echo "make exec.waves        Run execute stage testbench and plot waveforms"
 	@echo "make decode.waves      Run decode stage testbench and plot waveforms"
+	@echo "make forwarder.waves   Run forwarder testbench and plot waveforms"
 	@echo
 	@echo "make integration       Run the integration test and plot waveforms"
 	@echo
@@ -20,6 +21,9 @@ exec.waves:
 
 decode.waves:
 	iverilog -s decode_tb ../../common/*.v bench/verilog/*.v rtl/verilog/*.v -Iinclude/verilog -I../../common && vvp -n a.out && gtkwave decode.vcd
+
+forwarder.waves:
+	iverilog -s forwarder_tb ../../common/*.v bench/verilog/*.v rtl/verilog/*.v -Iinclude/verilog -I../../common && vvp -n a.out && gtkwave forwarder.vcd
 
 integration:
 	iverilog -s integration_tb ../../common/*.v bench/verilog/*.v rtl/verilog/*.v -Iinclude/verilog -I../../common && vvp -n a.out && gtkwave integration.vcd
