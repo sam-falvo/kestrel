@@ -25,6 +25,14 @@
 //		rs1val_i before next cycle.
 // rs2_o	As with rs1_o.
 //
+// Inputs from Execute Stage (Register Bypass Feedback):
+// ex_rd_i	The destination register to receive the execute-stage results.
+// ex_q_i	The value intended to be written to the above register.
+//
+// Inputs from Memory Stage (Register Bypass Feedback):
+// mem_rd_i	As above.
+// mem_q_i
+//
 // Outputs to the decode stage:
 //
 // inpa_o	ALU input value A.  Corresponds to RS1.
@@ -61,6 +69,11 @@ module decode(
 
 	input	[63:0]	rs1val_i,
 	input	[63:0]	rs2val_i,
+
+	input	[4:0]	ex_rd_i,
+	input	[4:0]	mem_rd_i,
+	input	[63:0]	ex_q_i,
+	input	[63:0]	mem_q_i,
 
 	output	[63:0]	inpa_o,
 	output	[63:0]	inpb_o,
@@ -102,6 +115,10 @@ module decode(
 	reg		nomem_o;
 	reg		mem_o;
 	reg	[2:0]	xrs_rwe_o;
+	reg	[4:0]	ex_rd_r, mem_rd_r;
+
+	wire	[4:0]	rs1_r = inst_r[19:15];
+	wire	[4:0]	rs2_r = inst_r[24:20];
 
 	// We make rs{1,2}_o depend on the instruction _inputs_
 	// (instead of the registered instruction) because it saves
@@ -112,9 +129,22 @@ module decode(
 	assign	rs1_o = inst_i[19:15];
 
 	assign	rd_o = inst_r[11:7];
+	wire	hit1_ex = (ex_rd_r === rs1_r) && |rs1_r;
+	wire	hit1_mem = (mem_rd_r === rs1_r) && |rs1_r;
+	wire	hit2_ex = (ex_rd_r === rs2_r) && |rs2_r;
+	wire	hit2_mem = (mem_rd_r === rs2_r) && |rs2_r;
+	wire	[63:0]	rs1val =
+		(hit1_ex ? ex_q_i
+                         : (hit1_mem ? mem_q_i
+                                     : rs1val_i));
+	wire	[63:0]	rs2val =
+		(hit2_ex ? ex_q_i
+                         : (hit2_mem ? mem_q_i
+                                     : rs2val_i));
 
 	wire	[63:0]	imm12 = {{52{inst_r[31]}}, inst_r[31:20]};
 	wire	[63:0]	imm12s = {{52{inst_r[31]}}, inst_r[31:25], inst_r[11:7]};
+
 
 	always @(*) begin
 		illegal_o <= 1;
@@ -142,13 +172,13 @@ module decode(
 			   (inst_r[4:2] == 3'b000) &&
 			   (inst_r[14] == 0)) begin
 				illegal_o <= 0;
-				inpa_o <= rs1val_i;
+				inpa_o <= rs1val;
 				inpb_o <= imm12s;
 				sum_en_o <= 1;
 				nomem_o <= 0;
 				mem_o <= 1;
 				we_o <= 1;
-				dat_o <= rs2val_i;
+				dat_o <= rs2val;
 				case (inst_r[13:12])
 				2'b00: xrs_rwe_o <= `XRS_RWE_S8;
 				2'b01: xrs_rwe_o <= `XRS_RWE_S16;
@@ -161,7 +191,7 @@ module decode(
 			if((inst_r[6:5] == 2'b00) &&
 			   (inst_r[4:2] == 3'b100)) begin
 				illegal_o <= 0;
-				inpa_o <= rs1val_i;
+				inpa_o <= rs1val;
 				inpb_o <= imm12;
 				case (inst_r[14:12])
 				3'b000: sum_en_o <= 1;
@@ -179,6 +209,8 @@ module decode(
 
 	always @(posedge clk_i) begin
 		inst_r <= inst_r;
+		ex_rd_r <= ex_rd_r;
+		mem_rd_r <= mem_rd_r;
 
 		if (reset_i) begin
 			inst_r <= `INST_NOP;
@@ -186,6 +218,8 @@ module decode(
 		else begin
 			if(inst_en_i) begin
 				inst_r <= inst_i;
+				ex_rd_r <= ex_rd_i;
+				mem_rd_r <= mem_rd_i;
 			end
 		end
 	end

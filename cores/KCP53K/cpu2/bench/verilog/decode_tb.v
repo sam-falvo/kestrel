@@ -10,7 +10,8 @@ module decode_tb();
 
 	reg		clk_i, reset_i, inst_en_i;
 	reg	[31:0]	inst_i;
-	reg	[63:0]	rs1val_i, rs2val_i;
+	reg	[63:0]	rs1val_i, rs2val_i, ex_q_i, mem_q_i;
+	reg	[4:0]	ex_rd_i, mem_rd_i;
 
 	wire	[63:0]	inpa_o, inpb_o;
 	wire		invB_o, cflag_o, lsh_en_o, rsh_en_o;
@@ -34,6 +35,11 @@ module decode_tb();
 		.inst_en_i(inst_en_i),
 		.rs1val_i(rs1val_i),
 		.rs2val_i(rs2val_i),
+
+		.ex_rd_i(ex_rd_i),
+		.mem_rd_i(mem_rd_i),
+		.ex_q_i(ex_q_i),
+		.mem_q_i(mem_q_i),
 
 		.inpa_o(inpa_o),
 		.inpb_o(inpb_o),
@@ -60,6 +66,7 @@ module decode_tb();
 	task zero;
 	begin
 		{
+			ex_rd_i, mem_rd_i, ex_q_i, mem_q_i,
 			reset_i, inst_i, rs1val_i, rs2val_i, inst_en_i,
 			story_to, fault_to
 		} <= 0;
@@ -93,6 +100,8 @@ module decode_tb();
 		$dumpvars;
 
 		zero;
+		ex_q_i <= 64'hFACE0BADC0FFEE00;
+		mem_q_i <= 64'hFEEDFACE0BADC0DE;
 		clk_i <= 0;
 		wait(~clk_i); wait(clk_i); #1;
 
@@ -301,6 +310,74 @@ module decode_tb();
 		assert_mem(1);
 		assert_dat(64'hDEAD_BEEF_FEED_FACE);
 		assert_xrs_rwe(`XRS_RWE_S64);
+		assert_illegal(0);
+
+		// ADDI X1, X2, 3
+		// X2 feedback from EX
+
+		story_to <= 12'h030;
+		inst_en_i <= 1;
+		inst_i <= 32'b000000000011_00010_000_00001_0010011;
+		ex_rd_i <= 2;
+
+		wait(~clk_i); wait(clk_i); #1;
+		wait(~clk_i); wait(clk_i); #1;
+		wait(~clk_i); wait(clk_i); #1;
+		wait(~clk_i); wait(clk_i); #1;
+
+		assert_inpa(64'hFACE_0BAD_C0FF_EE00);
+		assert_inpb(64'h0000_0000_0000_0003);
+		assert_invB(0);
+		assert_cflag(0);
+		assert_lsh_en(0);
+		assert_rsh_en(0);
+		assert_ltu_en(0);
+		assert_lts_en(0);
+		assert_sum_en(1);
+		assert_and_en(0);
+		assert_xor_en(0);
+		assert_rd(1);
+		assert_rs1(2);
+//		assert_rs2(0);
+		assert_we(0);
+		assert_nomem(1);
+		assert_mem(0);
+		assert_dat(0);
+		assert_xrs_rwe(`XRS_RWE_S64);
+		assert_illegal(0);
+
+		// SB X1, 1(X2)		0000000_00001_00010_000_00001_0100011
+
+		story_to <= 12'h038;
+		inst_en_i <= 1;
+		inst_i <= 32'b0000000_00001_00010_000_00001_0100011;
+		ex_rd_i <= 0;
+		mem_rd_i <= 1;
+
+		wait(~clk_i); wait(clk_i); #1;
+
+		#10 rs1val_i <= 64'd1;
+		rs2val_i <= 64'hDEAD_BEEF_FEED_FACE;
+		#1;
+		assert_inpa(64'd1);
+		assert_inpb(1);
+		assert_invB(0);
+		assert_cflag(0);
+		assert_lsh_en(0);
+		assert_rsh_en(0);
+		assert_ltu_en(0);
+		assert_lts_en(0);
+		assert_sum_en(1);
+		assert_and_en(0);
+		assert_xor_en(0);
+//		assert_rd(1);
+		assert_rs1(2);
+		assert_rs2(1);
+		assert_we(1);
+		assert_nomem(0);
+		assert_mem(1);
+		assert_dat(64'hFEEDFACE0BADC0DE);
+		assert_xrs_rwe(`XRS_RWE_S8);
 		assert_illegal(0);
 
 		#100;
