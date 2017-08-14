@@ -115,7 +115,6 @@ module decode(
 	reg		nomem_o;
 	reg		mem_o;
 	reg	[2:0]	xrs_rwe_o;
-	reg	[4:0]	ex_rd_r, mem_rd_r;
 
 	wire	[4:0]	rs1_r = inst_r[19:15];
 	wire	[4:0]	rs2_r = inst_r[24:20];
@@ -129,10 +128,12 @@ module decode(
 	assign	rs1_o = inst_i[19:15];
 
 	assign	rd_o = inst_r[11:7];
-	wire	hit1_ex = (ex_rd_r === rs1_r) && |rs1_r;
-	wire	hit1_mem = (mem_rd_r === rs1_r) && |rs1_r;
-	wire	hit2_ex = (ex_rd_r === rs2_r) && |rs2_r;
-	wire	hit2_mem = (mem_rd_r === rs2_r) && |rs2_r;
+	// We use ex_rd_i as-is, unregistered, because these signals
+	// will already be registered in subsequent pipeline stages.
+	wire	hit1_ex = (ex_rd_i === rs1_r) && |rs1_r;
+	wire	hit1_mem = (mem_rd_i === rs1_r) && |rs1_r;
+	wire	hit2_ex = (ex_rd_i === rs2_r) && |rs2_r;
+	wire	hit2_mem = (mem_rd_i === rs2_r) && |rs2_r;
 	wire	[63:0]	rs1val =
 		(hit1_ex ? ex_q_i
                          : (hit1_mem ? mem_q_i
@@ -209,8 +210,6 @@ module decode(
 
 	always @(posedge clk_i) begin
 		inst_r <= inst_r;
-		ex_rd_r <= ex_rd_r;
-		mem_rd_r <= mem_rd_r;
 
 		if (reset_i) begin
 			inst_r <= `INST_NOP;
@@ -218,8 +217,6 @@ module decode(
 		else begin
 			if(inst_en_i) begin
 				inst_r <= inst_i;
-				ex_rd_r <= ex_rd_i;
-				mem_rd_r <= mem_rd_i;
 			end
 		end
 	end
