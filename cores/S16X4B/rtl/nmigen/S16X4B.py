@@ -25,7 +25,7 @@ from nmigen.hdl.ast import (
 # Additionally, opcode 9 is reserved as a prefix for future
 # use.
 OPC_NOP = 0
-OPC_LI = 1
+OPC_LIT = 1
 OPC_FWM = 2
 OPC_SWM = 3
 OPC_ADD = 4
@@ -99,8 +99,17 @@ def create_s16x4b_interface(self, platform=''):
     if platform == 'formal':
         self.fv_pc = Signal(15)
         self.fv_iw = Signal(16)
+        self.fv_f_e = Signal(1)
+        self.fv_u = Signal(16)
+        self.fv_v = Signal(16)
+        self.fv_w = Signal(16)
+        self.fv_x = Signal(16)
+        self.fv_y = Signal(16)
+        self.fv_z = Signal(16)
+        self.fv_opc = Signal(4)
+        self.fv_cycle_done = Signal(1)
 
-    
+
 class S16X4B(Elaboratable):
     def __init__(self, platform=''):
         super().__init__()
@@ -112,11 +121,18 @@ class S16X4B(Elaboratable):
         comb = m.d.comb
 
         # Processor state
-        t0 = Signal(1, reset=1)            # instruction fetch
-        t1 = Signal(1, reset=0)            # execution cycle (T1-T4)
-
+        f_e = Signal(1, reset=1)           # fetch(1)/execute(0)
         pc = Signal(15, reset=0)           # Program Counter
         iw = Signal(16)                    # Instruction Word
+        U = Signal(16, reset=0)            # Evaluation stack bottom
+        V = Signal(16, reset=0)
+        W = Signal(16, reset=0)
+        X = Signal(16, reset=0)
+        Y = Signal(16, reset=0x0002)       # Processor core version tag.
+        Z = Signal(16, reset=0)            # Evaluation stack top
+
+        opc = Signal(4)                    # Currently executing opcode
+        comb += opc.eq(iw[12:16])
 
         # Our master interface implements Wishbone B.3, and only with
         # simple bus transactions at that.  CYC_O will always equal
@@ -133,7 +149,27 @@ class S16X4B(Elaboratable):
         ]
 
         # Instruction fetch logic
-        with m.If(t0):
+        #
+        # last_instruction is asserted when we're executing the
+        # last instruction in the IW register.
+        last_instruction = Signal(1)
+        comb += last_instruction.eq(~f_e & (iw[0:12] == 0))
+
+        # Force U-Z to be actual registers.  Unless they're
+        # explicitly modified elsewhere, these should *never*
+        # change.
+        sync += [
+            U.eq(U),
+            V.eq(V),
+            W.eq(W),
+            X.eq(X),
+            Y.eq(Y),
+            Z.eq(Z),
+        ]
+
+        # If we're fetching an instruction, then set the IW register
+        # with the fetched data and increment the PC.
+        with m.If(f_e):
             comb += [
                 self.adr_o.eq(pc),
                 self.we_o.eq(0),
@@ -144,19 +180,69 @@ class S16X4B(Elaboratable):
 
             with m.If(self.ack_i):
                 sync += [
-                    t0.eq(0),
-                    t1.eq(1),
+                    f_e.eq(0),
                     iw.eq(self.dat_i),
                     pc.eq(pc+1),
                 ]
+
+        # Execute instructions.  cycle_done is asserted when it's safe
+        # to move to the next opcode in the instruction word.
+        cycle_done = Signal(1)
+        comb += cycle_done.eq((~self.cyc_o) | (self.cyc_o & self.ack_i))
+
+        with m.If(~f_e):
+            with m.If(cycle_done):
+                sync += iw.eq(iw << 4)
+                with m.If(last_instruction):
+                    sync += f_e.eq(1)
+
+            with m.If(opc == OPC_LIT):
+                comb += [
+                    self.adr_o.eq(pc),
+                    self.we_o.eq(0),
+                    self.at_o.eq(AT_ARG),
+                    self.sel_o.eq(3),
+                    self.cyc_o.eq(1),
+                ]
+
+                with m.If(self.ack_i):
+                    sync += [
+                        pc.eq(pc+1),
+                        U.eq(V),
+                        V.eq(W),
+                        W.eq(X),
+                        X.eq(Y),
+                        Y.eq(Z),
+                        Z.eq(self.dat_i),
+                    ]
 
         if platform == 'formal':
             comb += [
                 self.fv_pc.eq(pc),
                 self.fv_iw.eq(iw),
+                self.fv_f_e.eq(f_e),
+                self.fv_u.eq(U),
+                self.fv_v.eq(V),
+                self.fv_w.eq(W),
+                self.fv_x.eq(X),
+                self.fv_y.eq(Y),
+                self.fv_z.eq(Z),
+                self.fv_opc.eq(opc),
+                self.fv_cycle_done.eq(cycle_done),
             ]
 
         return m
+
+
+def stack_is_stable(self):
+    return [
+        Assert(Stable(self.fv_z)),
+        Assert(Stable(self.fv_y)),
+        Assert(Stable(self.fv_x)),
+        Assert(Stable(self.fv_w)),
+        Assert(Stable(self.fv_v)),
+        Assert(Stable(self.fv_u)),
+    ]
 
 
 class S16X4BFormal(Elaboratable):
@@ -195,6 +281,14 @@ class S16X4BFormal(Elaboratable):
 
             self.fv_pc.eq(dut.fv_pc),
             self.fv_iw.eq(dut.fv_iw),
+            self.fv_f_e.eq(dut.fv_f_e),
+            self.fv_u.eq(dut.fv_u),
+            self.fv_v.eq(dut.fv_v),
+            self.fv_w.eq(dut.fv_w),
+            self.fv_x.eq(dut.fv_x),
+            self.fv_y.eq(dut.fv_y),
+            self.fv_z.eq(dut.fv_z),
+            self.fv_opc.eq(dut.fv_opc),
         ]
 
         # Connect DUT inputs.  These will be driven by the formal verifier
@@ -252,6 +346,116 @@ class S16X4BFormal(Elaboratable):
             Past(self.ack_i)
         ):
             sync += Assert(self.fv_iw == Past(self.dat_i))
+
+        # Fetching an instruction word with all NOPs will cause one
+        # execution cycle to elapse, and then it should commence fetching
+        # another instruction word.  Put another way, instruction
+        # slot 1 is always executed; but if slots 2-4 are NOPs, then we
+        # just fetch the next instruction word right away.
+
+        with m.If(
+            past_valid &
+            Past(self.stb_o) &
+            (Past(self.at_o) == AT_PGM) &
+            Past(self.ack_i) &
+            (Past(self.dat_i) == 0)
+        ):
+            sync += [
+                Assert(~self.fv_f_e),
+                Assert(~self.stb_o),
+            ]
+
+        # (if previous instruction was not a memory or I/O operation)
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_iw)[0:12] == 0) &
+            ~Past(self.stb_o)
+        ):
+            sync += [
+                Assert(self.fv_f_e),
+                Assert(self.adr_o == Past(self.fv_pc)),
+                Assert(~self.we_o),
+                Assert(self.sel_o == 3),
+                Assert(self.stb_o),
+                Assert(self.at_o == AT_PGM),
+            ]
+
+        # (if previous instruction was a mem/I/O op, and it's completed)
+        # (excluding LIT, as that advances PC.)
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_iw)[0:12] == 0) &
+            (Past(self.fv_opc) != OPC_LIT) &
+            Past(self.stb_o) &
+            Past(self.ack_i)
+        ):
+            sync += [
+                Assert(self.fv_f_e),
+                Assert(self.adr_o == Past(self.fv_pc)),
+                Assert(~self.we_o),
+                Assert(self.sel_o == 3),
+                Assert(self.stb_o),
+                Assert(self.at_o == AT_PGM),
+            ]
+
+        # If the currently executing opcode is NOP, then processor state should
+        # remain stable.
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_NOP)
+        ):
+            sync += [
+                Assert(self.fv_u == Past(self.fv_u)),
+                Assert(self.fv_v == Past(self.fv_v)),
+                Assert(self.fv_w == Past(self.fv_w)),
+                Assert(self.fv_x == Past(self.fv_x)),
+                Assert(self.fv_y == Past(self.fv_y)),
+                Assert(self.fv_z == Past(self.fv_z)),
+            ]
+
+        # If loading a literal, push the fetched value onto the stack.
+        with m.If(
+            past_valid &
+            ~self.fv_f_e &
+            (self.fv_opc == OPC_LIT)
+        ):
+            comb += [
+                Assert(self.adr_o == self.fv_pc),
+                Assert(~self.we_o),
+                Assert(self.sel_o == 3),
+                Assert(self.at_o == AT_ARG),
+                Assert(self.stb_o),
+            ]
+ 
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_LIT) &
+            Past(self.ack_i)
+        ):
+            sync += [
+                Assert(self.fv_z == Past(self.dat_i)),
+                Assert(self.fv_y == Past(self.fv_z)),
+                Assert(self.fv_x == Past(self.fv_y)),
+                Assert(self.fv_w == Past(self.fv_x)),
+                Assert(self.fv_v == Past(self.fv_w)),
+                Assert(self.fv_u == Past(self.fv_v)),
+                Assert(self.fv_pc == (Past(self.fv_pc)+1)[0:15]),
+            ]
+
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_LIT) &
+            ~Past(self.ack_i)
+        ):
+            sync += [
+                *stack_is_stable(self),
+                Assert(Stable(self.fv_pc)),
+            ]
 
         return m
         
