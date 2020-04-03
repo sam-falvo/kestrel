@@ -1,3 +1,9 @@
+# This module implements the S16X4B processor, a port of the S16X4A
+# processor from Verilog to nMigen.  Along the way, some additional
+# instructions and facilities have been added, mainly surrounding
+# interrupt and I/O processing facilities.
+
+
 from nmigen.test.utils import FHDLTestCase
 from nmigen import (
     Elaboratable,
@@ -13,12 +19,6 @@ from nmigen.hdl.ast import (
     Past,
     Stable,
 )
-
-# This module implements the S16X4B processor, a port of the S16X4A
-# processor from Verilog to nMigen.  Along the way, some additional
-# instructions and facilities have been added, mainly surrounding
-# interrupt and I/O processing facilities.
-
 
 # Unprefixed opcodes are 100% backward compatible with S16X4A.
 # New addition is the use of opcode 8 as an escape prefix.
@@ -42,10 +42,10 @@ OPC_GO = 14
 OPC_NZGO = 15
 
 # 8-prefixed opcodes below.
-PFX8_FWC = 0
-PFX8_SWC = 1
-PFX8_INW = 2
-PFX8_OUTW = 3
+PFX8_FCR = 0   # Fetch Control Register
+PFX8_SCR = 1   # Store Control Register
+PFX8_INW = 2   # Read word from I/O device
+PFX8_OUTW = 3  # Write word to I/O device
 PFX8_unk4 = 4
 PFX8_unk5 = 5
 PFX8_unk6 = 6
@@ -73,14 +73,14 @@ PFX8_unkF = 15
 # (I avoid the use of "Cycle Type" because this term has some
 # prior-defined meaning in the context of a Wishbone interconnect.)
 
-AT_IDLE = 0
-AT_DAT = 1
-AT_PGM = 2
-AT_ARG = 3
-AT_unk4 = 4
-AT_IO = 5
-AT_unk6 = 6
-AT_unk7 = 7
+AT_IDLE = 0  # Bus is idle; address is meaningless.
+AT_DAT = 1   # Bus is presenting a data memory address.
+AT_PGM = 2   # Bus is presenting a program memory address.
+AT_ARG = 3   # Bus is presenting a program memory address, but for an operand.
+AT_unk4 = 4  #
+AT_IO = 5    # Bus is presenting an I/O port address.
+AT_unk6 = 6  #
+AT_unk7 = 7  #
 
 
 def create_s16x4b_interface(self, platform=''):
@@ -93,7 +93,7 @@ def create_s16x4b_interface(self, platform=''):
     self.dat_o = Signal(16)
     self.ack_i = Signal(1)
     self.err_i = Signal(1)    # New with S16X4A (then called ABORT_I)
-    self.dat_i = Signal(1)
+    self.dat_i = Signal(16)
     self.irq_i = Signal(16)   # New with S16X4B
 
     if platform == 'formal':
@@ -115,6 +115,26 @@ class S16X4B(Elaboratable):
         super().__init__()
         create_s16x4b_interface(self, platform=platform)
 
+    def __pop_1(self, new_z):
+        return [
+            self.Z.eq(new_z),
+            self.Y.eq(self.X),
+            self.X.eq(self.W),
+            self.W.eq(self.V),
+            self.V.eq(self.U),
+            self.U.eq(self.U),
+        ]
+
+    def __pop_2(self):
+        return [
+            self.Z.eq(self.X),
+            self.Y.eq(self.W),
+            self.X.eq(self.V),
+            self.W.eq(self.U),
+            self.V.eq(self.U),
+            self.U.eq(self.U),
+        ]
+
     def elaborate(self, platform):
         m = Module()
         sync = m.d.sync
@@ -124,12 +144,12 @@ class S16X4B(Elaboratable):
         f_e = Signal(1, reset=1)           # fetch(1)/execute(0)
         pc = Signal(15, reset=0)           # Program Counter
         iw = Signal(16)                    # Instruction Word
-        U = Signal(16, reset=0)            # Evaluation stack bottom
-        V = Signal(16, reset=0)
-        W = Signal(16, reset=0)
-        X = Signal(16, reset=0)
-        Y = Signal(16, reset=0x0002)       # Processor core version tag.
-        Z = Signal(16, reset=0)            # Evaluation stack top
+        U = self.U = Signal(16, reset=0)            # Evaluation stack bottom
+        V = self.V = Signal(16, reset=0)
+        W = self.W = Signal(16, reset=0)
+        X = self.X = Signal(16, reset=0)
+        Y = self.Y = Signal(16, reset=0x0002)       # Processor core version tag.
+        Z = self.Z = Signal(16, reset=0)            # Evaluation stack top
 
         opc = Signal(4)                    # Currently executing opcode
         comb += opc.eq(iw[12:16])
@@ -216,6 +236,50 @@ class S16X4B(Elaboratable):
                         Z.eq(self.dat_i),
                     ]
 
+            with m.If(opc == OPC_FWM):
+                comb += [
+                    self.adr_o.eq(Z[1:]),
+                    self.we_o.eq(0),
+                    self.at_o.eq(AT_DAT),
+                    self.sel_o.eq(3),
+                    self.cyc_o.eq(1),
+                ]
+
+                with m.If(self.ack_i):
+                    sync += [
+                        Z.eq(self.dat_i),
+                    ]
+
+            with m.If(opc == OPC_SWM):
+                comb += [
+                    self.adr_o.eq(Z[1:]),
+                    self.dat_o.eq(Y),
+                    self.we_o.eq(1),
+                    self.at_o.eq(AT_DAT),
+                    self.sel_o.eq(3),
+                    self.cyc_o.eq(1),
+                ]
+
+                with m.If(self.ack_i):
+                    sync += self.__pop_2()
+
+            with m.If(opc == OPC_ADD):
+                sync += self.__pop_1((Z + Y)[0:16])
+
+            with m.If(opc == OPC_AND):
+                sync += self.__pop_1(Z & Y)
+
+            with m.If(opc == OPC_XOR):
+                sync += self.__pop_1(Z ^ Y)
+
+            with m.If(opc == OPC_ZGO):
+                sync += self.__pop_2()
+                with m.If(Y == 0):
+                    sync += [
+                        pc.eq(Z[1:]),
+                        f_e.eq(1),
+                    ]
+                
         if platform == 'formal':
             comb += [
                 self.fv_pc.eq(pc),
@@ -234,21 +298,62 @@ class S16X4B(Elaboratable):
         return m
 
 
-def stack_is_stable(self):
-    return [
-        Assert(Stable(self.fv_z)),
-        Assert(Stable(self.fv_y)),
-        Assert(Stable(self.fv_x)),
-        Assert(Stable(self.fv_w)),
-        Assert(Stable(self.fv_v)),
-        Assert(Stable(self.fv_u)),
-    ]
-
-
 class S16X4BFormal(Elaboratable):
     def __init__(self):
         super().__init__()
         create_s16x4b_interface(self, platform="formal")
+
+    def stack_is_stable(self, except_z=None):
+        if except_z is None:
+            except_z = Past(self.fv_z)
+        return [
+            Assert(self.fv_z == except_z),
+            Assert(Stable(self.fv_y)),
+            Assert(Stable(self.fv_x)),
+            Assert(Stable(self.fv_w)),
+            Assert(Stable(self.fv_v)),
+            Assert(Stable(self.fv_u)),
+        ]
+    
+    def stack_pop_1(self, new_z):
+        return [
+            Assert(self.fv_z == new_z),
+            Assert(self.fv_y == Past(self.fv_x)),
+            Assert(self.fv_x == Past(self.fv_w)),
+            Assert(self.fv_w == Past(self.fv_v)),
+            Assert(self.fv_v == Past(self.fv_u)),
+            Assert(self.fv_u == Past(self.fv_u)),
+        ]
+    
+    def stack_pop_2(self):
+        return [
+            Assert(self.fv_z == Past(self.fv_x)),
+            Assert(self.fv_y == Past(self.fv_w)),
+            Assert(self.fv_x == Past(self.fv_v)),
+            Assert(self.fv_w == Past(self.fv_u)),
+            Assert(self.fv_v == Past(self.fv_u)),
+            Assert(self.fv_u == Past(self.fv_u)),
+        ]
+
+    def is_word_fetch(self, address_type=AT_PGM, address=None):
+        if address is None:
+            address = self.fv_pc
+        return [
+            Assert(self.adr_o == address),
+            Assert(self.at_o == address_type),
+            Assert(~self.we_o),
+            Assert(self.sel_o == 3),
+            Assert(self.stb_o),
+        ]
+
+    def bus_is_stable(self):
+        return [
+            Assert(Stable(self.adr_o)),
+            Assert(Stable(self.we_o)),
+            Assert(Stable(self.stb_o)),
+            Assert(Stable(self.sel_o)),
+            Assert(Stable(self.at_o)),
+        ]
 
     def elaborate(self, platform):
         m = Module()
@@ -308,24 +413,12 @@ class S16X4BFormal(Elaboratable):
         # If the processor is reset, processor must commence instruction
         # execution at address 0.
         with m.If(z_past_valid & Fell(rst)):
-            sync += [
-                Assert(self.adr_o == 0),
-                Assert(self.we_o == 0),
-                Assert(self.stb_o == 1),
-                Assert(self.sel_o == 0x3),
-                Assert(self.at_o == AT_PGM),
-            ]
+            sync += self.is_word_fetch(address=0, address_type=AT_PGM)
 
         # If the processor is mid-bus-cycle and no acknowledgement exists
         # yet, we must insert a wait state.
         with m.If(past_valid & Past(self.stb_o) & ~Past(self.ack_i)):
-            sync += [
-                Assert(Stable(self.adr_o)),
-                Assert(Stable(self.we_o)),
-                Assert(Stable(self.stb_o)),
-                Assert(Stable(self.sel_o)),
-                Assert(Stable(self.at_o)),
-            ]
+            sync += self.bus_is_stable()
 
         # If we're fetching an instruction, the PC increments when the cycle
         # is acknowledged.  If we're fetching an opcode word, then make sure
@@ -360,29 +453,29 @@ class S16X4BFormal(Elaboratable):
             Past(self.ack_i) &
             (Past(self.dat_i) == 0)
         ):
-            sync += [
-                Assert(~self.fv_f_e),
-                Assert(~self.stb_o),
-            ]
+            sync += Assert(~self.fv_f_e)
 
-        # (if previous instruction was not a memory or I/O operation)
+        # (if previous instruction was not a memory or I/O operation
+        # and was not a branch instruction, whose cases are handled
+        # elsewhere...)
         with m.If(
             past_valid &
             ~Past(self.fv_f_e) &
             (Past(self.fv_iw)[0:12] == 0) &
+            (Past(self.fv_opc) != OPC_ZGO) &
+            (Past(self.fv_opc) != OPC_NZGO) &
+            (Past(self.fv_opc) != OPC_GO) &
+            (Past(self.fv_opc) != OPC_LCALL) &
+            (Past(self.fv_opc) != OPC_ICALL) &
             ~Past(self.stb_o)
         ):
             sync += [
                 Assert(self.fv_f_e),
-                Assert(self.adr_o == Past(self.fv_pc)),
-                Assert(~self.we_o),
-                Assert(self.sel_o == 3),
-                Assert(self.stb_o),
-                Assert(self.at_o == AT_PGM),
+                *self.is_word_fetch(address=Past(self.fv_pc), address_type=AT_PGM),
             ]
 
         # (if previous instruction was a mem/I/O op, and it's completed)
-        # (excluding LIT, as that advances PC.)
+        # (excluding LIT, as that advances PC; LIT is checked elsewhere.)
         with m.If(
             past_valid &
             ~Past(self.fv_f_e) &
@@ -393,11 +486,7 @@ class S16X4BFormal(Elaboratable):
         ):
             sync += [
                 Assert(self.fv_f_e),
-                Assert(self.adr_o == Past(self.fv_pc)),
-                Assert(~self.we_o),
-                Assert(self.sel_o == 3),
-                Assert(self.stb_o),
-                Assert(self.at_o == AT_PGM),
+                *self.is_word_fetch(address=Past(self.fv_pc), address_type=AT_PGM),
             ]
 
         # If the currently executing opcode is NOP, then processor state should
@@ -407,14 +496,7 @@ class S16X4BFormal(Elaboratable):
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_NOP)
         ):
-            sync += [
-                Assert(self.fv_u == Past(self.fv_u)),
-                Assert(self.fv_v == Past(self.fv_v)),
-                Assert(self.fv_w == Past(self.fv_w)),
-                Assert(self.fv_x == Past(self.fv_x)),
-                Assert(self.fv_y == Past(self.fv_y)),
-                Assert(self.fv_z == Past(self.fv_z)),
-            ]
+            sync += self.stack_is_stable()
 
         # If loading a literal, push the fetched value onto the stack.
         with m.If(
@@ -422,13 +504,7 @@ class S16X4BFormal(Elaboratable):
             ~self.fv_f_e &
             (self.fv_opc == OPC_LIT)
         ):
-            comb += [
-                Assert(self.adr_o == self.fv_pc),
-                Assert(~self.we_o),
-                Assert(self.sel_o == 3),
-                Assert(self.at_o == AT_ARG),
-                Assert(self.stb_o),
-            ]
+            comb += self.is_word_fetch(address=self.fv_pc, address_type=AT_ARG)
  
         with m.If(
             past_valid &
@@ -453,9 +529,122 @@ class S16X4BFormal(Elaboratable):
             ~Past(self.ack_i)
         ):
             sync += [
-                *stack_is_stable(self),
+                *self.stack_is_stable(),
                 Assert(Stable(self.fv_pc)),
             ]
+ 
+        # If fetching a word from memory, Z provides the memory address.
+        # Low bit of Z is ignored.  (Issue: support misalignment traps
+        # in the future?)
+        with m.If(
+            past_valid &
+            ~self.fv_f_e &
+            (self.fv_opc == OPC_FWM)
+        ):
+            comb += self.is_word_fetch(address=self.fv_z[1:16], address_type=AT_DAT)
+ 
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_FWM) &
+            Past(self.ack_i)
+        ):
+            sync += self.stack_is_stable(except_z=Past(self.dat_i))
+
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_FWM) &
+            ~Past(self.ack_i)
+        ):
+            sync += self.stack_is_stable()
+
+        # If storing a word from memory, Z provides the memory address,
+        # and Y the data to store.  Both are consumed.  Low bit of Z
+        # is ignored.  (Issue: support misalignment traps in the future?)
+        with m.If(
+            past_valid &
+            ~self.fv_f_e &
+            (self.fv_opc == OPC_SWM)
+        ):
+            comb += [
+                Assert(self.adr_o == self.fv_z[1:16]),
+                Assert(self.we_o),
+                Assert(self.sel_o == 3),
+                Assert(self.at_o == AT_DAT),
+                Assert(self.stb_o),
+                Assert(self.dat_o == self.fv_y),
+            ]
+ 
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_SWM) &
+            Past(self.ack_i)
+        ):
+            sync += self.stack_pop_2()
+
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_SWM) &
+            ~Past(self.ack_i)
+        ):
+            sync += self.stack_is_stable()
+
+        # Original Steamer-16 operators, + AND XOR
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_ADD)
+        ):
+            sync += self.stack_pop_1((Past(self.fv_z) + Past(self.fv_y))[0:16])
+
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_AND)
+        ):
+            sync += self.stack_pop_1(Past(self.fv_z) & Past(self.fv_y))
+
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_XOR)
+        ):
+            sync += self.stack_pop_1(Past(self.fv_z) ^ Past(self.fv_y))
+
+        # ZGO branches conditionally.  If Y=0, PC becomes the address in Z.
+        # (Low bit of Z is ignored.)  Otherwise PC is left unchanged.
+        # A successful branch takes immediate effect.
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_ZGO) &
+            (Past(self.fv_y) == 0)
+        ):
+            sync += [
+                *self.stack_pop_2(),
+                Assert(self.fv_f_e),
+                *self.is_word_fetch(address=Past(self.fv_z)[1:16], address_type=AT_PGM),
+            ]
+
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_ZGO) &
+            (Past(self.fv_y) != 0)
+        ):
+            sync += self.stack_pop_2()
+
+            with m.If(Past(self.fv_iw)[0:12] == 0):
+                sync += [
+                    Assert(self.fv_f_e),
+                    *self.is_word_fetch(address=self.fv_pc, address_type=AT_PGM),
+                ]
+
+            with m.If(Past(self.fv_iw)[0:12] != 0):
+                sync += Assert(~self.fv_f_e)
 
         return m
         
