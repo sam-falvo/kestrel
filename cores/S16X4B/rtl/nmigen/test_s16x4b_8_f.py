@@ -25,8 +25,10 @@ from interfaces import (
     AT_DAT,
     AT_PGM,
     OPC_FBM,
+    OPC_GO,
     OPC_ICALL,
     OPC_LCALL,
+    OPC_NZGO,
     OPC_SBM,
     create_s16x4b_interface,
 )
@@ -308,6 +310,51 @@ class S16X4B_8toF_Formal(Elaboratable):
                 *self.is_word_fetch(address=self.fv_pc, address_type=AT_PGM),
                 *self.stack_is_stable(except_z=Cat(Const(0, 1), Past(self.fv_pc))),
             ]
+
+        # GO branches unconditionally.
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_GO)
+        ):
+            sync += [
+                *self.stack_pop_1(Past(self.fv_y)),
+                Assert(self.fv_f_e),
+                *self.is_word_fetch(address=Past(self.fv_z)[1:16], address_type=AT_PGM),
+            ]
+
+        # NZGO branches conditionally.  If Y!=0, PC becomes the address in Z.
+        # (Low bit of Z is ignored.)  Otherwise PC is left unchanged.
+        # A successful branch takes immediate effect.
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_NZGO) &
+            (Past(self.fv_y) != 0)
+        ):
+            sync += [
+                *self.stack_pop_2(),
+                Assert(self.fv_f_e),
+                *self.is_word_fetch(address=Past(self.fv_z)[1:16], address_type=AT_PGM),
+            ]
+
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_NZGO) &
+            (Past(self.fv_y) == 0)
+        ):
+            sync += self.stack_pop_2()
+
+            with m.If(Past(self.fv_iw)[0:12] == 0):
+                sync += [
+                    Assert(self.fv_f_e),
+                    *self.is_word_fetch(address=self.fv_pc, address_type=AT_PGM),
+                ]
+
+            with m.If(Past(self.fv_iw)[0:12] != 0):
+                sync += Assert(~self.fv_f_e)
+
         return m
         
 

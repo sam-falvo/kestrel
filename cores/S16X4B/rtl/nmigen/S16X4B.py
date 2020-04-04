@@ -29,10 +29,12 @@ from interfaces import (
     OPC_AND,
     OPC_FBM,
     OPC_FWM,
+    OPC_GO,
     OPC_ICALL,
     OPC_LCALL,
     OPC_LIT,
     OPC_NOP,
+    OPC_NZGO,
     OPC_SBM,
     OPC_SWM,
     OPC_XOR,
@@ -263,6 +265,21 @@ class S16X4B(Elaboratable):
                     pc.eq(Z[1:]),
                     f_e.eq(1),
                 ]
+
+            with m.If(opc == OPC_GO):
+                sync += [
+                    *self.__pop_1(Y),
+                    f_e.eq(1),
+                    pc.eq(Z[1:]),
+                ]
+
+            with m.If(opc == OPC_NZGO):
+                sync += self.__pop_2()
+                with m.If(Y != 0):
+                    sync += [
+                        pc.eq(Z[1:]),
+                        f_e.eq(1),
+                    ]
 
         if platform == 'formal':
             comb += [
