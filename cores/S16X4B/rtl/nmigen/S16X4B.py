@@ -29,6 +29,7 @@ from interfaces import (
     OPC_AND,
     OPC_FBM,
     OPC_FWM,
+    OPC_ICALL,
     OPC_LCALL,
     OPC_LIT,
     OPC_NOP,
@@ -253,6 +254,13 @@ class S16X4B(Elaboratable):
                 sync += [
                     *self.__push_1(Cat(Const(0, 1), pc)),
                     pc.eq((pc + Cat(iw[0:12], iw[11], iw[11], iw[11]))[0:15]),
+                    f_e.eq(1),
+                ]
+
+            with m.If(opc == OPC_ICALL):
+                sync += [
+                    Z.eq(Cat(Const(0, 1), pc)),
+                    pc.eq(Z[1:]),
                     f_e.eq(1),
                 ]
 

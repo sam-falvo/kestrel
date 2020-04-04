@@ -25,6 +25,7 @@ from interfaces import (
     AT_DAT,
     AT_PGM,
     OPC_FBM,
+    OPC_ICALL,
     OPC_LCALL,
     OPC_SBM,
     create_s16x4b_interface,
@@ -286,6 +287,27 @@ class S16X4B_8toF_Formal(Elaboratable):
                 *self.stack_push_1(Cat(Const(0, 1), Past(self.fv_pc))),
             ]
 
+        # If calling a subroutine with ICALL,
+        # the Z and PC registers are swapped.
+        # The low-bit of Z is ignored, and the low bit of PC
+        # is assumed to be 0.
+        with m.If(
+            past_valid &
+            ~self.fv_f_e &
+            (self.fv_opc == OPC_ICALL)
+        ):
+            comb += Assert(~self.stb_o)
+
+        with m.If(
+            past_valid &
+            ~Past(self.fv_f_e) &
+            (Past(self.fv_opc) == OPC_ICALL)
+        ):
+            sync += [
+                Assert(self.fv_pc == Past(self.fv_z)[1:16]),
+                *self.is_word_fetch(address=self.fv_pc, address_type=AT_PGM),
+                *self.stack_is_stable(except_z=Cat(Const(0, 1), Past(self.fv_pc))),
+            ]
         return m
         
 
