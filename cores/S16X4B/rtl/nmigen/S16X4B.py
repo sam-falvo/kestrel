@@ -98,6 +98,18 @@ class S16X4B(Elaboratable):
         W = self.W = Signal(16)
         
         # Processor state (S16X4B)
+        current_slot = Signal(2)
+        ipa = Signal(len(pc))
+        ie = Signal(len(self.dat_i))
+        ehpc = Signal(len(pc))
+
+        epc = Signal(len(pc))
+        eiw = Signal(len(iw))
+        eipa = Signal(len(ipa))
+        eie = Signal(len(ie))
+        efe = Signal(len(f_e))
+        ecs = Signal(len(current_slot))
+        eat = Signal(len(self.at_o))
 
         # Currently executing opcode
         opc = Signal(4)
@@ -149,10 +161,23 @@ class S16X4B(Elaboratable):
         with m.If(take_trap):
             sync += [
                 take_trap.eq(0),
+
+                efe.eq(f_e),
+                epc.eq(pc),
+                eiw.eq(iw),
+                eipa.eq(ipa),
+                eie.eq(ie),
+                ecs.eq(current_slot),
+
+                f_e.eq(1),
+                pc.eq(ehpc),
+                ie.eq(0),
             ]
 
         # If we're fetching an instruction, then set the IW register
-        # with the fetched data and increment the PC.
+        # with the fetched data and increment the PC.  For the benefit
+        # of exception handlers, we also set IPA to the address of the
+        # fetched instruction, to facilitate restartability.
         with m.If(f_e & ~take_trap):
             comb += [
                 self.adr_o.eq(pc),
@@ -170,7 +195,10 @@ class S16X4B(Elaboratable):
                 ]
 
             with m.If(self.err_i):
-                sync += take_trap.eq(1)
+                sync += [
+                    take_trap.eq(1),
+                    eat.eq(self.at_o),
+                ]
 
         # Execute instructions.  cycle_done is asserted when it's safe
         # to move to the next opcode in the instruction word.
@@ -199,7 +227,10 @@ class S16X4B(Elaboratable):
                     ]
 
                 with m.If(self.err_i):
-                    sync += take_trap.eq(1)
+                    sync += [
+                        take_trap.eq(1),
+                        eat.eq(self.at_o),
+                    ]
 
             with m.If(opc == OPC_FWM):
                 comb += [
@@ -216,7 +247,10 @@ class S16X4B(Elaboratable):
                     ]
 
                 with m.If(self.err_i):
-                    sync += take_trap.eq(1)
+                    sync += [
+                        take_trap.eq(1),
+                        eat.eq(self.at_o),
+                    ]
 
             with m.If(opc == OPC_FBM):
                 comb += [
@@ -234,7 +268,10 @@ class S16X4B(Elaboratable):
                         sync += Z.eq(Cat(self.dat_i[0:8], Const(0, 8)))
 
                 with m.If(self.err_i):
-                    sync += take_trap.eq(1)
+                    sync += [
+                        take_trap.eq(1),
+                        eat.eq(self.at_o),
+                    ]
 
             with m.If(opc == OPC_SWM):
                 comb += [
@@ -250,7 +287,10 @@ class S16X4B(Elaboratable):
                     sync += self.__pop_2()
  
                 with m.If(self.err_i):
-                    sync += take_trap.eq(1)
+                    sync += [
+                        take_trap.eq(1),
+                        eat.eq(self.at_o),
+                    ]
 
             with m.If(opc == OPC_SBM):
                 comb += [
@@ -271,7 +311,10 @@ class S16X4B(Elaboratable):
                     sync += self.__pop_2()
 
                 with m.If(self.err_i):
-                    sync += take_trap.eq(1)
+                    sync += [
+                        take_trap.eq(1),
+                        eat.eq(self.at_o),
+                    ]
 
             with m.If(opc == OPC_ADD):
                 sync += self.__pop_1((Z + Y)[0:16])
@@ -332,6 +375,17 @@ class S16X4B(Elaboratable):
                 self.fv_z.eq(Z),
                 self.fv_opc.eq(opc),
                 self.fv_cycle_done.eq(cycle_done),
+                self.fv_current_slot.eq(current_slot),
+                self.fv_epc.eq(epc),
+                self.fv_ecs.eq(ecs),
+                self.fv_efe.eq(efe),
+                self.fv_eat.eq(eat),
+                self.fv_eiw.eq(eiw),
+                self.fv_eipa.eq(eipa),
+                self.fv_ipa.eq(ipa),
+                self.fv_ie.eq(ie),
+                self.fv_eie.eq(eie),
+                self.fv_ehpc.eq(ehpc),
             ]
 
         return m

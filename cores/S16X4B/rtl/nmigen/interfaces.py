@@ -90,5 +90,14 @@ def create_s16x4b_interface(self, platform=''):
         self.fv_z = Signal(16)
         self.fv_opc = Signal(4)
         self.fv_cycle_done = Signal(1)
-
-
+        self.fv_current_slot = Signal(2)
+        self.fv_epc = Signal(len(self.fv_pc))
+        self.fv_eat = Signal(len(self.at_o))
+        self.fv_ecs = Signal(len(self.fv_current_slot))
+        self.fv_efe = Signal(len(self.fv_f_e))
+        self.fv_eiw = Signal(len(self.fv_iw))
+        self.fv_eipa = Signal(len(self.fv_pc))
+        self.fv_ipa = Signal(len(self.fv_eipa))
+        self.fv_ie = Signal(len(self.dat_i))
+        self.fv_eie = Signal(len(self.fv_ie))
+        self.fv_ehpc = Signal(len(self.fv_pc))

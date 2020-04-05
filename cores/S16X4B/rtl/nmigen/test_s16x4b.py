@@ -1,5 +1,6 @@
 from nmigen.test.utils import FHDLTestCase
 from nmigen import (
+    Cat,
     Const,
     Elaboratable,
     Module,
@@ -135,6 +136,17 @@ class S16X4BFormal(Elaboratable):
             self.fv_y.eq(dut.fv_y),
             self.fv_z.eq(dut.fv_z),
             self.fv_opc.eq(dut.fv_opc),
+            self.fv_current_slot.eq(dut.fv_current_slot),
+            self.fv_epc.eq(dut.fv_epc),
+            self.fv_eat.eq(dut.fv_eat),
+            self.fv_ecs.eq(dut.fv_ecs),
+            self.fv_efe.eq(dut.fv_efe),
+            self.fv_eiw.eq(dut.fv_eiw),
+            self.fv_eipa.eq(dut.fv_eipa),
+            self.fv_ipa.eq(dut.fv_ipa),
+            self.fv_ie.eq(dut.fv_ie),
+            self.fv_eie.eq(dut.fv_eie),
+            self.fv_ehpc.eq(dut.fv_ehpc),
         ]
 
         # Connect DUT inputs.  These will be driven by the formal verifier
@@ -177,6 +189,39 @@ class S16X4BFormal(Elaboratable):
             Past(self.err_i)
         ):
             sync += Assert(self.trap_o)
+
+        # If the processor traps for any reason (including asynchronous
+        # interrupts) it must preserve its running state.
+        #
+        # Format of EPS register:
+        #
+        # 0000 0000 .... ....       Reserved
+        # .... .... aaa. ....  eat  AT_O at the time the exception happened
+        # .... .... ...f ....  efe  1 if instruction fetch; 0 otherwise.
+        # .... .... .... 00..       Reserved
+        # .... .... .... ..cc  ecs  Slot Counter (0=bits 15..12, etc.)
+        #
+        # The FV interface only exposes defined bits; reserved bits don't
+        # exist.
+        with m.If(
+            (test_id == 0x20) &
+            past_valid &
+            Past(self.trap_o)
+        ):
+            sync += [
+                Assert(self.fv_epc == Past(self.fv_pc)),
+                Assert(self.fv_ecs == Past(self.fv_current_slot)),
+                Assert(self.fv_efe == Past(self.fv_f_e)),
+                # We can't check fv_eat because we've already lost
+                # the important signal history.  :(
+                Assert(self.fv_eiw == Past(self.fv_iw)),
+                Assert(self.fv_eipa == Past(self.fv_ipa)),
+                Assert(self.fv_eie == Past(self.fv_ie)),
+
+                Assert(self.fv_pc == Past(self.fv_ehpc)),
+                Assert(self.fv_f_e),
+                Assert(self.fv_ie == 0),
+            ]
 
         # If we're fetching an instruction, the PC increments when the cycle
         # is acknowledged.  If we're fetching an opcode word, then make sure
