@@ -76,6 +76,7 @@ def create_s16x4b_interface(self, platform=''):
     self.err_i = Signal(1)    # New with S16X4A (then called ABORT_I)
     self.dat_i = Signal(16)
     self.irq_i = Signal(16)   # New with S16X4B
+    self.trap_o = Signal(1)   # New with S16X4B (acks interrupt/trap)
 
     if platform == 'formal':
         self.fv_pc = Signal(15)

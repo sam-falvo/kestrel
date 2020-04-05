@@ -83,20 +83,30 @@ class S16X4B(Elaboratable):
         sync = m.d.sync
         comb = m.d.comb
 
-        # Processor state
+        # Processor state (S16X4)
         f_e = Signal(1, reset=1)                    # fetch(1)/execute(0)
         pc = Signal(15, reset=0)                    # Program Counter
         iw = Signal(16)                             # Instruction Word
-        U = self.U = Signal(16, reset=0)            # Evaluation stack bottom
-        V = self.V = Signal(16, reset=0)
-        W = self.W = Signal(16, reset=0)
-        X = self.X = Signal(16, reset=0)
-        Y = self.Y = Signal(16, reset=0x0002)       # Processor core version tag.
-        Z = self.Z = Signal(16, reset=0)            # Evaluation stack top
+
+        X = self.X = Signal(16)                     # Bottom of evaluation stack.
+        Y = self.Y = Signal(16)
+        Z = self.Z = Signal(16, reset=2)            # Top of eval stack (version tag)
+
+        # Processor state (S16X4A)
+        U = self.U = Signal(16)                     # New bottom of eval stack
+        V = self.V = Signal(16)
+        W = self.W = Signal(16)
+        
+        # Processor state (S16X4B)
 
         # Currently executing opcode
         opc = Signal(4)
-        comb += opc.eq(iw[12:16])
+        take_trap = Signal(1)
+
+        comb += [
+            opc.eq(iw[12:16]),
+            self.trap_o.eq(take_trap),
+        ]
 
         # Our master interface implements Wishbone B.3, and only with
         # simple bus transactions at that.  CYC_O will always equal
@@ -131,9 +141,19 @@ class S16X4B(Elaboratable):
             Z.eq(Z),
         ]
 
+        # Handle traps.  Traps should contain enough information
+        # to allow a return-from-interrupt instruction to restart
+        # the instruction which caused the trap.  This should
+        # let a designer use an external memory-management unit
+        # to implement virtual memory or memory protection features.
+        with m.If(take_trap):
+            sync += [
+                take_trap.eq(0),
+            ]
+
         # If we're fetching an instruction, then set the IW register
         # with the fetched data and increment the PC.
-        with m.If(f_e):
+        with m.If(f_e & ~take_trap):
             comb += [
                 self.adr_o.eq(pc),
                 self.we_o.eq(0),
@@ -142,19 +162,22 @@ class S16X4B(Elaboratable):
                 self.cyc_o.eq(1),
             ]
 
-            with m.If(self.ack_i):
+            with m.If(self.ack_i & ~self.err_i):
                 sync += [
                     f_e.eq(0),
                     iw.eq(self.dat_i),
                     pc.eq(pc+1),
                 ]
 
+            with m.If(self.err_i):
+                sync += take_trap.eq(1)
+
         # Execute instructions.  cycle_done is asserted when it's safe
         # to move to the next opcode in the instruction word.
         cycle_done = Signal(1)
-        comb += cycle_done.eq((~self.cyc_o) | (self.cyc_o & self.ack_i))
+        comb += cycle_done.eq((~self.cyc_o) | (self.cyc_o & self.ack_i & ~self.err_i))
 
-        with m.If(~f_e):
+        with m.If(~f_e & ~take_trap):
             with m.If(cycle_done):
                 sync += iw.eq(iw << 4)
                 with m.If(last_instruction):
@@ -169,11 +192,14 @@ class S16X4B(Elaboratable):
                     self.cyc_o.eq(1),
                 ]
 
-                with m.If(self.ack_i):
+                with m.If(self.ack_i & ~self.err_i):
                     sync += [
                         *self.__push_1(self.dat_i),
                         pc.eq(pc+1),
                     ]
+
+                with m.If(self.err_i):
+                    sync += take_trap.eq(1)
 
             with m.If(opc == OPC_FWM):
                 comb += [
@@ -184,10 +210,13 @@ class S16X4B(Elaboratable):
                     self.cyc_o.eq(1),
                 ]
 
-                with m.If(self.ack_i):
+                with m.If(self.ack_i & ~self.err_i):
                     sync += [
                         Z.eq(self.dat_i),
                     ]
+
+                with m.If(self.err_i):
+                    sync += take_trap.eq(1)
 
             with m.If(opc == OPC_FBM):
                 comb += [
@@ -198,11 +227,14 @@ class S16X4B(Elaboratable):
                     self.cyc_o.eq(1),
                 ]
 
-                with m.If(self.ack_i):
+                with m.If(self.ack_i & ~self.err_i):
                     with m.If(Z[0]):
                         sync += Z.eq(Cat(self.dat_i[8:16], Const(0, 8)))
                     with m.If(~Z[0]):
                         sync += Z.eq(Cat(self.dat_i[0:8], Const(0, 8)))
+
+                with m.If(self.err_i):
+                    sync += take_trap.eq(1)
 
             with m.If(opc == OPC_SWM):
                 comb += [
@@ -214,9 +246,12 @@ class S16X4B(Elaboratable):
                     self.cyc_o.eq(1),
                 ]
 
-                with m.If(self.ack_i):
+                with m.If(self.ack_i & ~self.err_i):
                     sync += self.__pop_2()
  
+                with m.If(self.err_i):
+                    sync += take_trap.eq(1)
+
             with m.If(opc == OPC_SBM):
                 comb += [
                     self.adr_o.eq(Z[1:]),
@@ -232,8 +267,11 @@ class S16X4B(Elaboratable):
                 with m.If(Z[0]):
                     comb += self.dat_o.eq(Cat(Y[8:16], Y[8:16]))
 
-                with m.If(self.ack_i):
+                with m.If(self.ack_i & ~self.err_i):
                     sync += self.__pop_2()
+
+                with m.If(self.err_i):
+                    sync += take_trap.eq(1)
 
             with m.If(opc == OPC_ADD):
                 sync += self.__pop_1((Z + Y)[0:16])

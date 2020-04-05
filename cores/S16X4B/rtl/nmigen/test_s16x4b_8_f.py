@@ -159,6 +159,7 @@ class S16X4B_8toF_Formal(Elaboratable):
             self.sel_o.eq(dut.sel_o),
             self.at_o.eq(dut.at_o),
             self.dat_o.eq(dut.dat_o),
+            self.trap_o.eq(dut.trap_o),
 
             self.fv_pc.eq(dut.fv_pc),
             self.fv_iw.eq(dut.fv_iw),
@@ -186,6 +187,7 @@ class S16X4B_8toF_Formal(Elaboratable):
         with m.If(
             past_valid &
             ~self.fv_f_e &
+            ~self.trap_o &
             (self.fv_opc == OPC_FBM)
         ):
             comb += [
@@ -199,7 +201,8 @@ class S16X4B_8toF_Formal(Elaboratable):
             (Past(self.fv_opc) == OPC_FBM) &
             Past(self.sel_o)[0] &
             Past(self.stb_o) &
-            Past(self.ack_i)
+            Past(self.ack_i) &
+            ~Past(self.err_i)
         ):
             sync += self.stack_is_stable(except_z=Cat(Past(self.dat_i)[0:8], Const(0, 8)))
 
@@ -209,7 +212,8 @@ class S16X4B_8toF_Formal(Elaboratable):
             (Past(self.fv_opc) == OPC_FBM) &
             Past(self.sel_o)[1] &
             Past(self.stb_o) &
-            Past(self.ack_i)
+            Past(self.ack_i) &
+            ~Past(self.err_i)
         ):
             sync += self.stack_is_stable(except_z=Cat(Past(self.dat_i)[8:16], Const(0, 8)))
 
@@ -218,7 +222,8 @@ class S16X4B_8toF_Formal(Elaboratable):
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_FBM) &
             Past(self.stb_o) &
-            ~Past(self.ack_i)
+            ~Past(self.ack_i) &
+            ~Past(self.err_i)
         ):
             sync += self.stack_is_stable()
 
@@ -228,7 +233,8 @@ class S16X4B_8toF_Formal(Elaboratable):
             past_valid &
             ~self.fv_f_e &
             (self.fv_opc == OPC_SBM) &
-            ~self.fv_z[0]
+            ~self.fv_z[0] &
+            ~self.trap_o
         ):
             comb += [
                 *self.is_byte_store(address_type=AT_DAT, lane=0),
@@ -239,7 +245,8 @@ class S16X4B_8toF_Formal(Elaboratable):
             past_valid &
             ~self.fv_f_e &
             (self.fv_opc == OPC_SBM) &
-            self.fv_z[0]
+            self.fv_z[0] &
+            ~self.trap_o
         ):
             comb += [
                 *self.is_byte_store(address_type=AT_DAT, lane=1),
@@ -251,7 +258,8 @@ class S16X4B_8toF_Formal(Elaboratable):
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_SBM) &
             Past(self.stb_o) &
-            Past(self.ack_i)
+            Past(self.ack_i) &
+            ~Past(self.err_i)
         ):
             sync += self.stack_pop_2()
 
@@ -260,7 +268,8 @@ class S16X4B_8toF_Formal(Elaboratable):
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_SBM) &
             Past(self.stb_o) &
-            ~Past(self.ack_i)
+            ~Past(self.ack_i) &
+            ~Past(self.err_i)
         ):
             sync += self.stack_is_stable()
 
