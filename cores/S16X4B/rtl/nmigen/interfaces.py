@@ -76,7 +76,8 @@ def create_s16x4b_interface(self, platform=''):
     self.err_i = Signal(1)    # New with S16X4A (then called ABORT_I)
     self.dat_i = Signal(16)
     self.irq_i = Signal(16)   # New with S16X4B
-    self.trap_o = Signal(1)   # New with S16X4B (acks interrupt/trap)
+    self.trap_o = Signal(1)   # New with S16X4B (acks all exceptions)
+    self.intack_o = Signal(1) # New with S16X4B (acks only interrupts)
 
     if platform == 'formal':
         self.fv_pc = Signal(15)
@@ -101,3 +102,8 @@ def create_s16x4b_interface(self, platform=''):
         self.fv_ie = Signal(len(self.dat_i))
         self.fv_eie = Signal(len(self.fv_ie))
         self.fv_ehpc = Signal(len(self.fv_pc))
+        self.fv_ihpc = Signal(len(self.fv_pc))
+        self.fv_take_int = Signal(1)
+        self.fv_sample_fe = Signal(1)
+        self.fv_sample_at = Signal(len(self.fv_eat))
+        self.fv_take_trap = Signal(1)

@@ -160,6 +160,7 @@ class S16X4B_8toF_Formal(Elaboratable):
             self.at_o.eq(dut.at_o),
             self.dat_o.eq(dut.dat_o),
             self.trap_o.eq(dut.trap_o),
+            self.intack_o.eq(dut.intack_o),
 
             self.fv_pc.eq(dut.fv_pc),
             self.fv_iw.eq(dut.fv_iw),
@@ -171,6 +172,8 @@ class S16X4B_8toF_Formal(Elaboratable):
             self.fv_y.eq(dut.fv_y),
             self.fv_z.eq(dut.fv_z),
             self.fv_opc.eq(dut.fv_opc),
+            self.fv_ie.eq(dut.fv_ie),
+            self.fv_take_int.eq(dut.fv_take_int),
         ]
 
         # Connect DUT inputs.  These will be driven by the formal verifier
@@ -182,9 +185,13 @@ class S16X4B_8toF_Formal(Elaboratable):
             dut.irq_i.eq(self.irq_i),
         ]
 
+        # Test ID to help identify which tests are responsible for failures.
+        test_id = Signal(8)
+
         # If fetching a byte from memory, Z provides the memory address.
         # Low bit of Z determines which byte lane to use.
         with m.If(
+            (test_id == 0x30) &
             past_valid &
             ~self.fv_f_e &
             ~self.trap_o &
@@ -196,6 +203,7 @@ class S16X4B_8toF_Formal(Elaboratable):
             ]
 
         with m.If(
+            (test_id == 0x31) &
             past_valid &
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_FBM) &
@@ -207,6 +215,7 @@ class S16X4B_8toF_Formal(Elaboratable):
             sync += self.stack_is_stable(except_z=Cat(Past(self.dat_i)[0:8], Const(0, 8)))
 
         with m.If(
+            (test_id == 0x32) &
             past_valid &
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_FBM) &
@@ -218,6 +227,7 @@ class S16X4B_8toF_Formal(Elaboratable):
             sync += self.stack_is_stable(except_z=Cat(Past(self.dat_i)[8:16], Const(0, 8)))
 
         with m.If(
+            (test_id == 0x33) &
             past_valid &
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_FBM) &
@@ -230,6 +240,7 @@ class S16X4B_8toF_Formal(Elaboratable):
         # If storing a byte to memory, Z provides the memory address.
         # Low bit of Z determines which byte lane to use.
         with m.If(
+            (test_id == 0x34) &
             past_valid &
             ~self.fv_f_e &
             (self.fv_opc == OPC_SBM) &
@@ -242,6 +253,7 @@ class S16X4B_8toF_Formal(Elaboratable):
             ]
  
         with m.If(
+            (test_id == 0x35) &
             past_valid &
             ~self.fv_f_e &
             (self.fv_opc == OPC_SBM) &
@@ -254,6 +266,7 @@ class S16X4B_8toF_Formal(Elaboratable):
             ]
 
         with m.If(
+            (test_id == 0x36) &
             past_valid &
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_SBM) &
@@ -264,6 +277,7 @@ class S16X4B_8toF_Formal(Elaboratable):
             sync += self.stack_pop_2()
 
         with m.If(
+            (test_id == 0x37) &
             past_valid &
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_SBM) &
@@ -279,6 +293,7 @@ class S16X4B_8toF_Formal(Elaboratable):
         # word displacement to the *current* program counter,
         # not the address of the LCALL instruction.
         with m.If(
+            (test_id == 0x38) &
             past_valid &
             ~self.fv_f_e &
             (self.fv_opc == OPC_LCALL)
@@ -286,6 +301,7 @@ class S16X4B_8toF_Formal(Elaboratable):
             comb += Assert(~self.stb_o)
 
         with m.If(
+            (test_id == 0x39) &
             past_valid &
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_LCALL)
@@ -303,6 +319,7 @@ class S16X4B_8toF_Formal(Elaboratable):
         # The low-bit of Z is ignored, and the low bit of PC
         # is assumed to be 0.
         with m.If(
+            (test_id == 0x3A) &
             past_valid &
             ~self.fv_f_e &
             (self.fv_opc == OPC_ICALL)
@@ -310,6 +327,7 @@ class S16X4B_8toF_Formal(Elaboratable):
             comb += Assert(~self.stb_o)
 
         with m.If(
+            (test_id == 0x3B) &
             past_valid &
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_ICALL)
@@ -322,6 +340,7 @@ class S16X4B_8toF_Formal(Elaboratable):
 
         # GO branches unconditionally.
         with m.If(
+            (test_id == 0x3C) &
             past_valid &
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_GO)
@@ -336,6 +355,7 @@ class S16X4B_8toF_Formal(Elaboratable):
         # (Low bit of Z is ignored.)  Otherwise PC is left unchanged.
         # A successful branch takes immediate effect.
         with m.If(
+            (test_id == 0x3D) &
             past_valid &
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_NZGO) &
@@ -348,6 +368,7 @@ class S16X4B_8toF_Formal(Elaboratable):
             ]
 
         with m.If(
+            (test_id == 0x3E) &
             past_valid &
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_NZGO) &
@@ -364,8 +385,27 @@ class S16X4B_8toF_Formal(Elaboratable):
             with m.If(Past(self.fv_iw)[0:12] != 0):
                 sync += Assert(~self.fv_f_e)
 
+        # An interrupt pending condition exists when the IP register ANDed with IE
+        # (Interrupt Pending /\ Interrupt Enable) is non-zero.  It's only sampled,
+        # however, when the bus is idle or during the end of an existing bus cycle.
+
+        with m.If(
+            ((Past(self.fv_ie) & Past(self.irq_i)) != 0) &
+            (~Past(self.cyc_o) | (Past(self.cyc_o) & (Past(self.ack_i) | Past(self.err_i))))
+        ):
+            sync += Assert(self.fv_take_int)
+
+        # If interrupts are pending when we're about to fetch the next instruction
+        # packet, we must trap instead.
+
+        with m.If(
+            self.fv_take_int &
+            self.fv_f_e
+        ):
+            comb += Assert(self.trap_o)
+
         return m
-        
+
 
 class S16X4B_8toF_FormalTest(FHDLTestCase):
     def test_8toF(self):

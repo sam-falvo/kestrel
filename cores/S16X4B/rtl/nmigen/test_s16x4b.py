@@ -12,6 +12,7 @@ from nmigen.hdl.ast import (
     Assume,
     Fell,
     Past,
+    Rose,
     Stable,
 )
 
@@ -125,6 +126,7 @@ class S16X4BFormal(Elaboratable):
             self.at_o.eq(dut.at_o),
             self.dat_o.eq(dut.dat_o),
             self.trap_o.eq(dut.trap_o),
+            self.intack_o.eq(dut.intack_o),
 
             self.fv_pc.eq(dut.fv_pc),
             self.fv_iw.eq(dut.fv_iw),
@@ -147,6 +149,10 @@ class S16X4BFormal(Elaboratable):
             self.fv_ie.eq(dut.fv_ie),
             self.fv_eie.eq(dut.fv_eie),
             self.fv_ehpc.eq(dut.fv_ehpc),
+            self.fv_ihpc.eq(dut.fv_ihpc),
+            self.fv_sample_at.eq(dut.fv_sample_at),
+            self.fv_sample_fe.eq(dut.fv_sample_fe),
+            self.fv_take_trap.eq(dut.fv_take_trap),
         ]
 
         # Connect DUT inputs.  These will be driven by the formal verifier
@@ -203,25 +209,47 @@ class S16X4BFormal(Elaboratable):
         #
         # The FV interface only exposes defined bits; reserved bits don't
         # exist.
+
+        ### For some reason, FV thinks that take_trap can come out of reset
+        ### set.  So, we must expose it via the FV interface and explicitly
+        ### test for a rising edge on it.  *sigh*
+        with m.If(
+            (test_id == 0xA0) &
+            past_valid &
+            Rose(self.fv_take_trap) &
+            Stable(self.intack_o) & ~self.intack_o
+        ):
+            sync += [
+                Assert(self.fv_sample_at == Past(self.at_o)),
+                Assert(self.fv_sample_fe == Past(self.fv_f_e)),
+            ]
+
         with m.If(
             (test_id == 0x20) &
             past_valid &
             Past(self.trap_o)
         ):
+            # Others can be checked only after TRAP_O is fallen, as the
+            # previous cycle is where all the common logic for handling a
+            # trap sits.
             sync += [
                 Assert(self.fv_epc == Past(self.fv_pc)),
                 Assert(self.fv_ecs == Past(self.fv_current_slot)),
-                Assert(self.fv_efe == Past(self.fv_f_e)),
-                # We can't check fv_eat because we've already lost
-                # the important signal history.  :(
                 Assert(self.fv_eiw == Past(self.fv_iw)),
                 Assert(self.fv_eipa == Past(self.fv_ipa)),
                 Assert(self.fv_eie == Past(self.fv_ie)),
+                Assert(self.fv_eat == Past(self.fv_sample_at)),
+                Assert(self.fv_efe == Past(self.fv_sample_fe)),
 
-                Assert(self.fv_pc == Past(self.fv_ehpc)),
                 Assert(self.fv_f_e),
                 Assert(self.fv_ie == 0),
             ]
+
+            with m.If(~Past(self.intack_o)):
+                sync += Assert(self.fv_pc == Past(self.fv_ehpc))
+
+            with m.If(Past(self.intack_o)):
+                sync += Assert(self.fv_pc == Past(self.fv_ihpc))
 
         # If we're fetching an instruction, the PC increments when the cycle
         # is acknowledged.  If we're fetching an opcode word, then make sure
@@ -278,7 +306,7 @@ class S16X4BFormal(Elaboratable):
             (Past(self.fv_opc) != OPC_LCALL) &
             (Past(self.fv_opc) != OPC_ICALL) &
             ~Past(self.stb_o) &
-            ~Past(self.trap_o)
+            ~self.trap_o
         ):
             sync += [
                 Assert(self.fv_f_e),
@@ -295,7 +323,8 @@ class S16X4BFormal(Elaboratable):
             (Past(self.fv_opc) != OPC_LIT) &
             Past(self.stb_o) &
             Past(self.ack_i) &
-            ~Past(self.err_i)
+            ~Past(self.err_i) &
+            ~self.trap_o
         ):
             sync += [
                 Assert(self.fv_f_e),
@@ -308,7 +337,8 @@ class S16X4BFormal(Elaboratable):
             (test_id == 9) &
             past_valid &
             ~Past(self.fv_f_e) &
-            (Past(self.fv_opc) == OPC_NOP)
+            (Past(self.fv_opc) == OPC_NOP) &
+            ~Past(self.trap_o)
         ):
             sync += self.stack_is_stable()
 
@@ -463,7 +493,8 @@ class S16X4BFormal(Elaboratable):
             past_valid &
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_ZGO) &
-            (Past(self.fv_y) == 0)
+            (Past(self.fv_y) == 0) &
+            ~self.trap_o
         ):
             sync += [
                 *self.stack_pop_2(),
@@ -476,7 +507,8 @@ class S16X4BFormal(Elaboratable):
             past_valid &
             ~Past(self.fv_f_e) &
             (Past(self.fv_opc) == OPC_ZGO) &
-            (Past(self.fv_y) != 0)
+            (Past(self.fv_y) != 0) &
+            ~self.trap_o
         ):
             sync += self.stack_pop_2()
 
