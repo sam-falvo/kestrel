@@ -354,7 +354,7 @@ class Token(object):
 
 
 def kindOfIdentifier(s):
-    s = string.upper(s)
+    s = s.upper()
     kindMap = {
         'DWORD': dwordToken,
         'WORD': wordToken,
@@ -1074,7 +1074,7 @@ class Assembler(object):
             return
 
         elif self.lexerState == lexingHexConstant:
-            if string.upper(ch) not in hexDigits:
+            if str(ch).upper() not in hexDigits:
                 return self.tokenTransition(
                     ch,
                     Token(
@@ -1133,7 +1133,7 @@ class Assembler(object):
             v = self.symbols[i].a
             if self.symbols[i].kind == EN_INT:
                 syms.append((i, v, hex(v)))
-        syms.sort(cmp=lambda x, y: -1 if x[1]<y[1] else 1 if x[1]>y[1] else 0)
+        syms.sort(key=lambda x: x[1])
         for s in syms:
             name, value, hexval = s
             error("{} = {} ({})".format(name, value, hexval))

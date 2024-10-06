@@ -8,7 +8,7 @@ import abc
 class CGFileLike(object):
     __metaclass__ = abc.ABCMeta
 
-CGFileLike.register(file)
+# CGFileLike.register(file)
 
 
 # A mask covering bits in a RISC-V instruction that maps to the destination
@@ -45,7 +45,7 @@ class RawExporter(object):
     """
 
     def __init__(self, f):
-        assert(isinstance(f, CGFileLike))
+#       assert(isinstance(f, CGFileLike))
         self._out = f
 
     def exportSegment(self, seg):
